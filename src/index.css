@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 25% 97%;
+    --foreground: 230 25% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 25% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 25% 12%;
+    --primary: 235 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 175 60% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 175 60% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 235 70% 55%;
+    --radius: 0.6rem;
+    
+    /* Transport mode colors */
+    --bus: 25 95% 55%;
+    --taxi: 45 100% 50%;
+    --train: 235 70% 55%;
+    --carpool: 150 60% 45%;
+    --fuel: 340 70% 55%;
+    
+    --chart-1: 235 70% 55%;
+    --chart-2: 175 60% 45%;
+    --chart-3: 25 95% 55%;
+    --chart-4: 45 100% 50%;
+    --chart-5: 150 60% 45%;
+    --sidebar: 0 0% 98%;
+    --sidebar-foreground: 230 25% 12%;
+    --sidebar-primary: 235 70% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 92%;
+    --sidebar-accent-foreground: 230 25% 12%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 235 70% 55%;
+  }
+
+  .dark {
+    --background: 230 25% 8%;
+    --foreground: 0 0% 98%;
+    --card: 230 20% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 230 20% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 235 75% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 175 55% 50%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 230 15% 18%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 175 55% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 15% 22%;
+    --input: 230 15% 22%;
+    --ring: 235 75% 60%;
+    
+    /* Transport mode colors */
+    --bus: 25 90% 55%;
+    --taxi: 45 100% 50%;
+    --train: 235 75% 60%;
+    --carpool: 150 55% 50%;
+    --fuel: 340 65% 55%;
+    
+    --chart-1: 235 75% 60%;
+    --chart-2: 175 55% 50%;
+    --chart-3: 25 90% 55%;
+    --chart-4: 45 100% 50%;
+    --chart-5: 150 55% 50%;
+    --sidebar: 230 20% 12%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 235 75% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 230 15% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 230 15% 22%;
+    --sidebar-ring: 235 75% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+}
+
+/* Custom Map Animations */
+@keyframes dash-animation {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.route-line-animation {
+  animation: dash-animation 20s linear infinite;
+}
+
+@keyframes marker-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+}
+
+.marker-pulse {
+  animation: marker-pulse 2s infinite;
+}
+
+@keyframes live-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+
+.live-marker {
+  animation: live-pulse 1.5s infinite;
+}
+
