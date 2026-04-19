@@ -65,19 +65,25 @@ export default function TrainCard({ train, classType, onClassChange, onRefresh }
         </div>
 
         <div className="min-w-[270px] space-y-4 rounded-2xl bg-slate-950 p-4 text-slate-50">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-300">Class</span>
-            <select
-              value={classType}
-              onChange={(event) => onClassChange(event.target.value)}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            >
+          <div className="space-y-2">
+            <span className="text-sm text-slate-300">Available Classes</span>
+            <div className="flex flex-wrap gap-2">
               {train.classes.map((item) => (
-                <option key={item.type} value={item.type}>
-                  {item.type}
-                </option>
+                <button
+                  key={item.type}
+                  type="button"
+                  onClick={() => onClassChange(item.type)}
+                  className={`flex-1 min-w-[70px] rounded-lg border p-2 text-center transition-colors ${
+                    classType === item.type
+                      ? "border-primary bg-primary/20 text-white"
+                      : "border-slate-700 bg-slate-900/50 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  <div className="text-sm font-bold">{item.type}</div>
+                  <div className="text-xs">₹{item.baseFare}</div>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className="rounded-xl bg-slate-900/80 p-3">

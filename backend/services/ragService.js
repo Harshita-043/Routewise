@@ -118,7 +118,11 @@ Return a JSON object strictly matching this schema:
       "departureTime": "08:00",
       "arrivalTime": "14:30",
       "duration": "6h 30m",
-      "classes": [{"type": "SL", "baseFare": 300, "reservationCharge": 20, "dynamicMultiplier": 1}],
+      "classes": [
+        {"type": "SL", "baseFare": 300, "reservationCharge": 20, "dynamicMultiplier": 1},
+        {"type": "3A", "baseFare": 800, "reservationCharge": 40, "dynamicMultiplier": 1},
+        {"type": "2A", "baseFare": 1200, "reservationCharge": 50, "dynamicMultiplier": 1}
+      ],
       "days": ["monday", "tuesday"]
     }
   ]
@@ -126,6 +130,7 @@ Return a JSON object strictly matching this schema:
 Rules:
 - Do NOT hallucinate.
 - Filter invalid results. Ensure trainNumber, departureTime, and arrivalTime exist.
+- Extract ALL available travel classes (e.g., SL, 3A, 2A, 1A, CC) and their respective fares if present in the context. If not present, try to estimate reasonably based on standard Indian Railway fares for the distance.
 - If unsure or no valid trains found, return {"trains": []}.`;
     
     try {

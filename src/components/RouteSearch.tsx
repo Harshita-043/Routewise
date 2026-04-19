@@ -42,8 +42,6 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   const [selectedDest, setSelectedDest] = useState<Location | null>(initialDestination || null);
   const [activeField, setActiveField] = useState<"source" | "dest" | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [classType, setClassType] = useState("SL");
 
   // Sync state if initial props change (e.g. on restoration)
   useEffect(() => {
@@ -149,7 +147,10 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedSource && selectedDest) {
-      onSearch(selectedSource, selectedDest, { date, classType });
+      onSearch(selectedSource, selectedDest, { 
+        date: new Date().toISOString().split("T")[0], 
+        classType: "SL" 
+      });
     }
   };
 
@@ -180,7 +181,7 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="bg-card rounded-2xl shadow-xl border border-border/50 p-6 md:p-8">
-        <div className="grid gap-4 xl:grid-cols-[1fr_auto_1fr_180px_150px_190px] xl:items-stretch">
+        <div className="grid gap-4 xl:grid-cols-[1fr_auto_1fr_200px] xl:items-stretch">
           {/* Source Input */}
           <div className="flex-1 relative" ref={sourceRef}>
             <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
@@ -261,25 +262,6 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
           </div>
 
           {/* Calculate Button */}
-          <input
-            type="date"
-            value={date}
-            min={new Date().toISOString().split("T")[0]}
-            onChange={(event) => setDate(event.target.value)}
-            className="h-14 rounded-lg border border-border bg-muted/50 px-4 outline-none focus:ring-2 focus:ring-primary/30"
-          />
-
-          <select
-            value={classType}
-            onChange={(event) => setClassType(event.target.value)}
-            className="h-14 rounded-lg border border-border bg-muted/50 px-4 outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="SL">SL</option>
-            <option value="3A">3A</option>
-            <option value="2A">2A</option>
-            <option value="1A">1A</option>
-            <option value="CC">CC</option>
-          </select>
 
           <Button
             type="submit"
@@ -302,7 +284,7 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
         
         {/* Helper text */}
         <p className="text-xs text-muted-foreground mt-4 text-center">
-          Start typing locations in India, then choose your train class and journey date
+          Start typing locations in India to calculate your route
         </p>
       </div>
     </form>
