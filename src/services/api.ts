@@ -195,6 +195,8 @@ export interface RouteSearchFilters {
   classType: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+
 const API_UNAVAILABLE_MESSAGE =
   "Could not reach the RouteWise API. Start the backend server and try again.";
 
@@ -214,12 +216,22 @@ async function parseErrorMessage(response: Response, fallbackMessage: string) {
   return data.error || fallbackMessage;
 }
 
-async function requestJson<T>(input: RequestInfo | URL, init: RequestInit, fallbackMessage: string): Promise<T> {
-  let response: Response;
+async function requestJson<T>(input: string, init: RequestInit, fallbackMessage: string, retries = 2): Promise<T> {
+  const url = input.startsWith("/") ? `${API_BASE}${input}` : input;
+  let response: Response | undefined;
 
-  try {
-    response = await fetch(input, init);
-  } catch {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      response = await fetch(url, init);
+      break;
+    } catch {
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+    }
+  }
+
+  if (!response) {
     throw new Error(API_UNAVAILABLE_MESSAGE);
   }
 
