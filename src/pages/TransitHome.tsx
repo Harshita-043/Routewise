@@ -610,7 +610,7 @@ export default function TransitHome() {
                   </div>
                   <div className="rounded-xl bg-muted/30 p-4">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Journey Date</p>
-                    <p className="text-lg font-semibold">{filters.date}</p>
+                    <p className="text-lg font-semibold">{liveStatus.date}</p>
                   </div>
                 </div>
               </section>
