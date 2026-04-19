@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { MapPin, Navigation, ArrowRight, Loader2 } from "lucide-react";
+import { MapPin, Navigation, ArrowRight, Loader2, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { RouteSearchFilters } from "@/services/api";
 
@@ -33,6 +33,8 @@ const fetchLocationSuggestions = async (query: string, signal?: AbortSignal): Pr
   }
 };
 
+const TODAY = new Date().toISOString().split("T")[0];
+
 export default function RouteSearch({ onSearch, isLoading, initialSource, initialDestination }: RouteSearchProps) {
   const [sourceQuery, setSourceQuery] = useState(initialSource?.display_name || "");
   const [destQuery, setDestQuery] = useState(initialDestination?.display_name || "");
@@ -42,6 +44,7 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   const [selectedDest, setSelectedDest] = useState<Location | null>(initialDestination || null);
   const [activeField, setActiveField] = useState<"source" | "dest" | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [travelDate, setTravelDate] = useState(TODAY);
 
   // Sync state if initial props change (e.g. on restoration)
   useEffect(() => {
@@ -147,9 +150,9 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedSource && selectedDest) {
-      onSearch(selectedSource, selectedDest, { 
-        date: new Date().toISOString().split("T")[0], 
-        classType: "SL" 
+      onSearch(selectedSource, selectedDest, {
+        date: travelDate,
+        classType: "SL", // default; per-train class chosen in TrainCard
       });
     }
   };
@@ -181,6 +184,7 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="bg-card rounded-2xl shadow-xl border border-border/50 p-6 md:p-8">
+        {/* Row 1: From / Swap / To / Submit */}
         <div className="grid gap-4 xl:grid-cols-[1fr_auto_1fr_200px] xl:items-stretch">
           {/* Source Input */}
           <div className="flex-1 relative" ref={sourceRef}>
@@ -262,7 +266,6 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
           </div>
 
           {/* Calculate Button */}
-
           <Button
             type="submit"
             disabled={isLoading || isSearching || !selectedSource || !selectedDest}
@@ -281,11 +284,28 @@ export default function RouteSearch({ onSearch, isLoading, initialSource, initia
             )}
           </Button>
         </div>
-        
-        {/* Helper text */}
-        <p className="text-xs text-muted-foreground mt-4 text-center">
-          Start typing locations in India to calculate your route
-        </p>
+
+        {/* Date Picker Row */}
+        <div className="mt-6 flex flex-col items-center justify-center border-t border-border/40 pt-5">
+          <div className="relative w-full max-w-md">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors">
+              <CalendarDays className="w-5 h-5" />
+            </div>
+            <input
+              id="travel-date"
+              type="date"
+              min={TODAY}
+              value={travelDate}
+              onChange={(e) => setTravelDate(e.target.value || TODAY)}
+              className="w-full pl-12 pr-4 h-14 text-base bg-card/50 border border-border/60 hover:border-border/80 rounded-xl focus:ring-2 focus:ring-primary/30 focus:border-primary/50 focus:outline-none text-foreground cursor-pointer shadow-sm transition-all"
+            />
+          </div>
+          {/* Helper text */}
+          <p className="text-xs text-muted-foreground mt-3 text-center flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/60"></span>
+            Select your train class directly on the train cards below
+          </p>
+        </div>
       </div>
     </form>
   );

@@ -53,6 +53,28 @@ function buildTrainResult(train, classType, date, score) {
   irctcUrl.searchParams.set("doj", date || "");
   irctcUrl.searchParams.set("class", fareBreakdown.classType);
 
+  const standardClasses = ["1A", "2A", "3A", "SL"];
+  let finalClasses = [...(train.classes || [])];
+  
+  // If the train only has 1 or 0 classes (e.g. from a lazy RAG extraction), auto-populate standard ones
+  if (finalClasses.length <= 1) {
+    const baseSL = finalClasses.find(c => c.type === "SL")?.baseFare || 300;
+    standardClasses.forEach(cls => {
+      if (!finalClasses.some(c => c.type === cls)) {
+        // Multipliers: 3A=2.6, 2A=3.8, 1A=6.5
+        const mult = cls === "3A" ? 2.6 : cls === "2A" ? 3.8 : cls === "1A" ? 6.5 : 1.0;
+        finalClasses.push({
+          type: cls,
+          baseFare: Math.round(baseSL * mult),
+          reservationCharge: cls === "SL" ? 25 : cls === "3A" ? 45 : cls === "2A" ? 60 : 75,
+          dynamicMultiplier: 1
+        });
+      }
+    });
+    // Sort by class hierarchy (1A -> 2A -> 3A -> SL)
+    finalClasses.sort((a, b) => standardClasses.indexOf(a.type) - standardClasses.indexOf(b.type));
+  }
+
   return {
     trainNo: train.trainNo || train.trainNumber,
     trainName: train.trainName,
@@ -68,8 +90,9 @@ function buildTrainResult(train, classType, date, score) {
     classType: fareBreakdown.classType,
     fare: fareBreakdown.total,
     fareBreakdown,
-    classes: train.classes || [],
+    classes: finalClasses,
     intermediateStations: train.intermediateStations || [],
+
     routePolyline: train.routePolyline || [],
     score: Number((score || 0).toFixed(3)),
     bookingUrl: irctcUrl.toString(),

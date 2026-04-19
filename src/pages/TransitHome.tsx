@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { BriefcaseBusiness, Bus, Car, Fuel, History, LogOut, MapPin, Save, Sparkles, Train, User, Users } from "lucide-react";
+import { BriefcaseBusiness, Bus, Car, Fuel, History, LogOut, MapPin, RadioTower, Save, Sparkles, Train, User, Users, Wifi } from "lucide-react";
 import FareComparisonPanel, { type ComparisonCard } from "@/components/FareComparisonPanel";
 import NearbyStations from "@/components/NearbyStations";
 import PNRStatus from "@/components/PNRStatus";
@@ -553,13 +553,7 @@ export default function TransitHome() {
                     key={`${train.trainNo}-${train.classType}`}
                     train={train}
                     classType={filters.classType}
-                    onClassChange={(classType) => {
-                      if (!lastSearchRef.current) return;
-                      const nextFilters = { ...filters, classType };
-                      setFilters(nextFilters);
-                      lastSearchRef.current = { ...lastSearchRef.current, filters: nextFilters };
-                      refreshTrainPanels(lastSearchRef.current.source, lastSearchRef.current.destination, nextFilters, routeResult).catch(() => undefined);
-                    }}
+                    date={filters.date}
                     onRefresh={() => {
                       if (!lastSearchRef.current) return;
                       refreshTrainPanels(lastSearchRef.current.source, lastSearchRef.current.destination, filters, routeResult).catch(() => undefined);
@@ -570,20 +564,52 @@ export default function TransitHome() {
             ) : null}
 
             {liveStatus ? (
-              <section className="rounded-2xl border border-border/50 bg-card p-5 shadow-lg">
-                <h3 className="text-xl font-bold">Train Running Status</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{liveStatus.status}</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <section className="rounded-2xl border border-border/50 bg-card p-5 shadow-lg space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <RadioTower className="h-5 w-5 text-primary" />
+                    <h3 className="text-xl font-bold">Live Train Status</h3>
+                    <span className="text-sm text-muted-foreground">· {trainResults[0]?.trainName ?? liveStatus.trainNo}</span>
+                  </div>
+                  {/* RAG vs simulated badge */}
+                  {liveStatus.source === "rag" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      <Wifi className="h-3.5 w-3.5" />
+                      Live via AI Web Search
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      Estimated · No live data
+                    </span>
+                  )}
+                </div>
+
+                {/* Status description */}
+                <p className="text-sm text-muted-foreground">{liveStatus.status}</p>
+
+                {/* Stat grid */}
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-xl bg-muted/30 p-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Current station</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Current Station</p>
                     <p className="text-lg font-semibold">{liveStatus.currentStation}</p>
                   </div>
                   <div className="rounded-xl bg-muted/30 p-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Delay</p>
-                    <p className="text-lg font-semibold">{liveStatus.delayMinutes} min</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Delay</p>
+                    <span
+                      className={`inline-block rounded-full px-3 py-1 text-sm font-bold ${
+                        liveStatus.delayMinutes === 0
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : liveStatus.delayMinutes <= 15
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      }`}
+                    >
+                      {liveStatus.delayMinutes === 0 ? "On time" : `+${liveStatus.delayMinutes} min`}
+                    </span>
                   </div>
                   <div className="rounded-xl bg-muted/30 p-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Journey date</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Journey Date</p>
                     <p className="text-lg font-semibold">{filters.date}</p>
                   </div>
                 </div>

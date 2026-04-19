@@ -129,7 +129,7 @@ export interface TrainLiveStatus {
     lng: number;
   };
   status: string;
-  source: string;
+  source: "rag" | "simulated" | string;
 }
 
 export interface SavedTrainRoute {
@@ -402,6 +402,28 @@ export async function fetchTrainFare(trainNo: string, params: { date: string; cl
     `/api/trains/${trainNo}/fare?${query}`,
     {},
     "Could not fetch train fare",
+  );
+}
+
+/**
+ * Computes a fare breakdown by sending the train's own class data to the backend.
+ * Works for both MongoDB-backed trains and RAG/web-sourced trains that are not in the DB.
+ */
+export async function calculateTrainFareInline(payload: {
+  trainNo: string;
+  trainName: string;
+  classes: Array<{ type: string; baseFare: number; reservationCharge: number; dynamicMultiplier: number }>;
+  date: string;
+  classType: string;
+}) {
+  return requestJson<TrainFareBreakdown>(
+    "/api/trains/fare/calculate",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "Could not calculate train fare",
   );
 }
 

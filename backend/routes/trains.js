@@ -154,4 +154,23 @@ router.get("/:trainNo/fare", async (req, res) => {
   return res.json(buildFareBreakdown({ train, classType, date }));
 });
 
+/**
+ * POST /api/trains/fare/calculate
+ * Computes fare breakdown from inline train data (no DB lookup).
+ * Used for RAG/web-sourced trains that are not stored in TrainSchedule.
+ * Body: { trainNo, trainName, classes: [{type, baseFare, reservationCharge, dynamicMultiplier}], date, classType }
+ */
+router.post("/fare/calculate", async (req, res) => {
+  const { trainNo, trainName, classes, date, classType = "SL" } = req.body || {};
+
+  if (!trainNo || !trainName || !Array.isArray(classes) || classes.length === 0) {
+    return res.status(400).json({ error: "trainNo, trainName, and classes[] are required" });
+  }
+
+  const syntheticTrain = { trainNo, trainName, classes };
+  const journeyDate = String(date || new Date().toISOString().split("T")[0]);
+
+  return res.json(buildFareBreakdown({ train: syntheticTrain, classType, date: journeyDate }));
+});
+
 export default router;
