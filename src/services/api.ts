@@ -195,7 +195,7 @@ export interface RouteSearchFilters {
   classType: string;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 const API_UNAVAILABLE_MESSAGE =
   "Could not reach the RouteWise API. Start the backend server and try again.";
@@ -222,9 +222,17 @@ async function requestJson<T>(input: string, init: RequestInit, fallbackMessage:
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      response = await fetch(url, init);
+      // Add a 30-second timeout to prevent indefinite hangs
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const mergedInit: RequestInit = {
+        ...init,
+        signal: controller.signal,
+      };
+      response = await fetch(url, mergedInit);
+      clearTimeout(timeoutId);
       break;
-    } catch {
+    } catch (err) {
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
       }

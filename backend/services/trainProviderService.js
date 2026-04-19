@@ -26,8 +26,6 @@ function toProviderDocument(rawTrain, sourceProvider = "rapidapi") {
 }
 
 export async function fetchTrainDocumentsForIngestion() {
-  // RapidAPI endpoints removed. Relying on professional deterministic seed engine
-  // to populate the MongoDB train catalog which serves as the fallback for our RAG.
   console.log("Populating DB with deterministic train schedules...");
   return buildSeedTrainDocuments().map((record) => toProviderDocument(record, "seed"));
 }

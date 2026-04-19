@@ -17,6 +17,23 @@ import {
 import { initializeTrainData } from "./trainScheduler.js";
 import { seedStations } from "./stationService.js";
 
+/**
+ * Safe insertMany wrapper that swallows duplicate-key errors (code 11000).
+ * This prevents startup crashes when the server restarts and seed data already exists.
+ */
+async function safeInsertMany(Model, docs) {
+  try {
+    await Model.insertMany(docs, { ordered: false });
+  } catch (err) {
+    // MongoDB error code 11000 = duplicate key — safe to ignore during seeding
+    if (err?.code === 11000 || err?.writeErrors?.every(e => e.code === 11000)) {
+      console.log(`[Seed] Skipped duplicates for ${Model.modelName}`);
+    } else {
+      throw err;
+    }
+  }
+}
+
 export async function seedDatabase({ force = false } = {}) {
   const trainCount = await Train.countDocuments();
 
@@ -38,11 +55,11 @@ export async function seedDatabase({ force = false } = {}) {
     ]);
   }
 
-  await Driver.insertMany(driverSeeds, { ordered: false });
-  await Train.insertMany(trainSeeds, { ordered: false });
-  await Bus.insertMany(busSeeds, { ordered: false });
-  await Taxi.insertMany(taxiSeeds, { ordered: false });
-  await Carpool.insertMany(carpoolSeeds, { ordered: false });
+  await safeInsertMany(Driver, driverSeeds);
+  await safeInsertMany(Train, trainSeeds);
+  await safeInsertMany(Bus, busSeeds);
+  await safeInsertMany(Taxi, taxiSeeds);
+  await safeInsertMany(Carpool, carpoolSeeds);
   await seedStations();
   await initializeTrainData();
 

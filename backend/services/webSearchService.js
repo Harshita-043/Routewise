@@ -17,7 +17,7 @@ export async function searchWeb(query) {
         gl: "in",
         num: 5,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {

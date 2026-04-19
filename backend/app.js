@@ -16,8 +16,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Request logging for debugging
+app.use((req, _res, next) => {
+  if (req.path.startsWith("/api")) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 app.use("/api/auth", authRoutes);
@@ -27,8 +35,12 @@ app.use("/api", driverRoutes);
 app.use("/api/admin", seedRoutes);
 app.use("/api/trains", trainRoutes);
 
+// Global error handler — must have 4 parameters for Express to recognise it
 app.use((error, _req, res, _next) => {
-  console.error(error);
+  console.error("[Global Error Handler]", error);
+  if (res.headersSent) {
+    return;
+  }
   res.status(500).json({ error: "Internal server error" });
 });
 
@@ -39,5 +51,15 @@ export async function initializeBackend() {
   startTrainScheduler();
   return app;
 }
+
+// Prevent process crashes from unhandled promise rejections
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled Promise Rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught Exception:", error);
+  // Don't exit — let the process stay alive in dev mode
+});
 
 export default app;

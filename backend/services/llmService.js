@@ -1,3 +1,6 @@
+const LLM_EXTRACTION_TIMEOUT_MS = 15000;
+const LLM_CHAT_TIMEOUT_MS = 10000;
+
 export async function extractStructuredData(systemPrompt, userPrompt) {
   const messages = [
     { role: "system", content: systemPrompt },
@@ -17,12 +20,13 @@ export async function extractStructuredData(systemPrompt, userPrompt) {
           messages,
           temperature: 0.2
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(LLM_EXTRACTION_TIMEOUT_MS)
       });
       if (res.ok) {
         const data = await res.json();
         return JSON.parse(data.choices[0].message.content);
       }
+      console.warn(`[LLM] OpenAI extraction HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("[LLM] OpenAI extraction failed:", err.message);
@@ -41,12 +45,13 @@ export async function extractStructuredData(systemPrompt, userPrompt) {
           messages,
           temperature: 0.2
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(LLM_EXTRACTION_TIMEOUT_MS)
       });
       if (res.ok) {
         const data = await res.json();
         return JSON.parse(data.choices[0].message.content);
       }
+      console.warn(`[LLM] Groq extraction HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("[LLM] Groq extraction failed:", err.message);
@@ -65,12 +70,13 @@ export async function extractStructuredData(systemPrompt, userPrompt) {
           messages,
           temperature: 0.2
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(LLM_EXTRACTION_TIMEOUT_MS)
       });
       if (res.ok) {
         const data = await res.json();
         return JSON.parse(data.choices[0].message.content);
       }
+      console.warn(`[LLM] Together extraction HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("[LLM] Together extraction failed:", err.message);
@@ -97,12 +103,13 @@ export async function generateChatResponse(systemPrompt, userPrompt) {
           messages,
           temperature: 0.7
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(LLM_CHAT_TIMEOUT_MS)
       });
       if (res.ok) {
         const data = await res.json();
         return data.choices[0].message.content;
       }
+      console.warn(`[LLM] OpenAI chat HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("[LLM] OpenAI chat failed:", err.message);
@@ -120,12 +127,13 @@ export async function generateChatResponse(systemPrompt, userPrompt) {
           messages,
           temperature: 0.7
         }),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(LLM_CHAT_TIMEOUT_MS)
       });
       if (res.ok) {
         const data = await res.json();
         return data.choices[0].message.content;
       }
+      console.warn(`[LLM] Groq chat HTTP ${res.status}`);
     }
   } catch (err) {
     console.warn("[LLM] Groq chat failed:", err.message);
