@@ -1,8 +1,11 @@
 import { TrainSchedule } from "../models/TrainSchedule.js";
+import { RagCache } from "../models/RagCache.js";
 import { embedText, cosineSimilarity } from "./embeddingService.js";
 import { buildFareBreakdown } from "./fareEngine.js";
 import { attachAvailability } from "./trainAvailabilityService.js";
 import { getWeekdayForDate, isPlaceMatch, normalizePlace, scorePlaceSimilarity } from "../utils/utils.js";
+import { generateChatResponse, extractStructuredData } from "./llmService.js";
+import { searchWeb } from "./webSearchService.js";
 
 function minutesFromTime(value) {
   const [hours = "0", minutes = "0"] = String(value).split(":");
@@ -24,7 +27,7 @@ function rankTrain(train, { from, to, date, classType }) {
     score += 60;
   }
 
-  if (train.classes.some((item) => item.type === classType)) {
+  if (train.classes && train.classes.some((item) => item.type === classType)) {
     score += 25;
   }
 
@@ -44,14 +47,14 @@ function rankTrain(train, { from, to, date, classType }) {
 function buildTrainResult(train, classType, date, score) {
   const fareBreakdown = buildFareBreakdown({ train, classType, date });
   const irctcUrl = new URL("https://www.irctc.co.in/nget/train-search");
-  irctcUrl.searchParams.set("trainNo", train.trainNo);
+  irctcUrl.searchParams.set("trainNo", train.trainNo || train.trainNumber);
   irctcUrl.searchParams.set("from", train.sourceCode || normalizePlace(train.source).toUpperCase().slice(0, 4));
   irctcUrl.searchParams.set("to", train.destinationCode || normalizePlace(train.destination).toUpperCase().slice(0, 4));
   irctcUrl.searchParams.set("doj", date || "");
   irctcUrl.searchParams.set("class", fareBreakdown.classType);
 
   return {
-    trainNo: train.trainNo,
+    trainNo: train.trainNo || train.trainNumber,
     trainName: train.trainName,
     source: train.source,
     destination: train.destination,
@@ -60,101 +63,140 @@ function buildTrainResult(train, classType, date, score) {
     departureTime: train.departureTime,
     arrivalTime: train.arrivalTime,
     duration: train.duration,
-    runningDays: train.runningDays,
-    distanceKm: train.distanceKm,
+    runningDays: train.runningDays || train.days || [],
+    distanceKm: train.distanceKm || 500,
     classType: fareBreakdown.classType,
     fare: fareBreakdown.total,
     fareBreakdown,
-    classes: train.classes,
-    intermediateStations: train.intermediateStations,
-    routePolyline: train.routePolyline,
-    score: Number(score.toFixed(3)),
+    classes: train.classes || [],
+    intermediateStations: train.intermediateStations || [],
+    routePolyline: train.routePolyline || [],
+    score: Number((score || 0).toFixed(3)),
     bookingUrl: irctcUrl.toString(),
   };
 }
 
-import { generateChatResponse, extractStructuredData } from "./openaiService.js";
-import { searchWeb } from "./webSearchService.js";
-
 export async function searchTrains({ from, to, date, classType = "SL", limit = 10 }) {
-  // 1. Attempt Live Web RAG Search
-  console.log(`[RAG] Searching web for trains from ${from} to ${to} on ${date}...`);
-  const query = `live train schedule from ${from} to ${to} ${date || ""}`;
+  // 1. Check MongoDB RagCache
+  console.log(`[RAG] Checking cache for trains from ${from} to ${to} on ${date}...`);
+  const normalizedFrom = normalizePlace(from);
+  const normalizedTo = normalizePlace(to);
+
+  const cached = await RagCache.findOne({
+    from: normalizedFrom,
+    to: normalizedTo,
+    date,
+    classType
+  }).lean();
+
+  if (cached && Array.isArray(cached.trains) && cached.trains.length > 0) {
+    console.log("[RAG] Cache hit! Returning instant results.");
+    let finalTrains = cached.trains.slice(0, limit);
+    finalTrains = await attachAvailability(finalTrains, date, classType);
+    const aiSummary = await buildSummary(finalTrains, from, to, date);
+    return { results: finalTrains, aiSummary };
+  }
+
+  // 2. Attempt Live Web RAG Search
+  console.log(`[RAG] Cache miss. Searching web for trains from ${from} to ${to} on ${date}...`);
+  const query = `trains from ${from} to ${to} on ${date} india`;
   const webContext = await searchWeb(query);
   
   let liveTrains = [];
   
   if (webContext) {
-    const systemPrompt = `You are a real-time data extraction engine for Indian Railways.
-The user provides you with raw text snippets from a live web search.
-Extract a list of trains running between the given stations.
+    const systemPrompt = `You are a strict data extraction engine for Indian Railways.
+Extract a list of trains running between the given stations based ONLY on the provided context.
 Return a JSON object strictly matching this schema:
 {
   "trains": [
     {
-      "trainNo": "12345",
+      "trainNumber": "12345",
       "trainName": "Sample Express",
       "source": "Origin Station",
       "destination": "Dest Station",
       "departureTime": "08:00",
       "arrivalTime": "14:30",
       "duration": "6h 30m",
-      "distanceKm": 500,
-      "classes": [{"type": "SL", "baseFare": 300, "reservationCharge": 20, "dynamicMultiplier": 1}]
+      "classes": [{"type": "SL", "baseFare": 300, "reservationCharge": 20, "dynamicMultiplier": 1}],
+      "days": ["monday", "tuesday"]
     }
   ]
 }
-If no trains are found, return {"trains": []}. Be as accurate as possible using the search context.`;
+Rules:
+- Do NOT hallucinate.
+- Filter invalid results. Ensure trainNumber, departureTime, and arrivalTime exist.
+- If unsure or no valid trains found, return {"trains": []}.`;
     
     try {
-      const extracted = await extractStructuredData(systemPrompt, `Snippets:\n${webContext}`);
-      if (extracted && Array.isArray(extracted.trains) && extracted.trains.length > 0) {
-        liveTrains = extracted.trains.map((t, idx) => {
+      const extracted = await extractStructuredData(systemPrompt, `Context:\n${webContext}`);
+      if (extracted && Array.isArray(extracted.trains)) {
+        liveTrains = extracted.trains.filter(t => t.trainNumber && t.departureTime && t.arrivalTime).map((t, idx) => {
           const score = 100 - idx; // Rank them in order of extraction
           return buildTrainResult({
             ...t,
-            runningDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
-            intermediateStations: [],
-            routePolyline: []
+            runningDays: t.days && t.days.length ? t.days : ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
+            classes: t.classes || [{type: classType, baseFare: 300, reservationCharge: 20, dynamicMultiplier: 1}]
           }, classType, date, score);
         });
-        console.log(`[RAG] Successfully extracted ${liveTrains.length} live trains from web!`);
+        console.log(`[RAG] Successfully extracted ${liveTrains.length} valid live trains from web!`);
       }
     } catch (err) {
       console.error("[RAG] Web extraction failed:", err);
     }
   }
 
-  // 2. Fallback to Local MongoDB Seed Data if Web RAG fails
   let finalTrains = liveTrains;
-  if (finalTrains.length === 0) {
-    console.log("[RAG] Falling back to local MongoDB seed data...");
-    const queryEmbedding = await embedText(buildSearchText({ from, to, date, classType }));
-    const trains = await TrainSchedule.find().lean();
 
-    finalTrains = trains
-      .map((train) => {
-        const semanticScore = cosineSimilarity(queryEmbedding, train.embedding || []);
-        const rerankScore = rankTrain(train, { from, to, date, classType });
-        const totalScore = semanticScore * 100 + rerankScore;
-        return buildTrainResult(train, classType, date, totalScore);
-      })
-      .filter((train) => train.score > 40 || (isPlaceMatch(train.source, from, 65) && isPlaceMatch(train.destination, to, 65)))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, limit);
+  // 3. Fallback to Local MongoDB Data if Web RAG completely fails
+  if (finalTrains.length === 0) {
+    console.log("[RAG] Web Search/Extraction failed or returned 0 results. Falling back to high-coverage local MongoDB data...");
+    try {
+      const queryEmbedding = await embedText(buildSearchText({ from, to, date, classType }));
+      const trains = await TrainSchedule.find().lean();
+
+      finalTrains = trains
+        .map((train) => {
+          const semanticScore = cosineSimilarity(queryEmbedding, train.embedding || []);
+          const rerankScore = rankTrain(train, { from, to, date, classType });
+          const totalScore = semanticScore * 100 + rerankScore;
+          return buildTrainResult(train, classType, date, totalScore);
+        })
+        .filter((train) => train.score > 40 || (isPlaceMatch(train.source, from, 65) && isPlaceMatch(train.destination, to, 65)))
+        .sort((left, right) => right.score - left.score)
+        .slice(0, limit);
+    } catch(err) {
+      console.error("[RAG] Fallback MongoDB search failed:", err);
+    }
   } else {
-    // Limit live trains
+    // 4. Save successful RAG result to cache
     finalTrains = finalTrains.slice(0, limit);
+    try {
+      await RagCache.create({
+        from: normalizedFrom,
+        to: normalizedTo,
+        date,
+        classType,
+        trains: finalTrains
+      });
+      console.log("[RAG] Saved live results to cache.");
+    } catch (err) {
+      console.error("[RAG] Failed to cache results:", err);
+    }
   }
 
-  // Attach availability (this will use our simulated provider now)
+  // 5. Build Final Output
   finalTrains = await attachAvailability(finalTrains, date, classType);
+  const aiSummary = await buildSummary(finalTrains, from, to, date);
 
-  // 3. Build AI Summary Context
+  return { results: finalTrains, aiSummary };
+}
+
+async function buildSummary(finalTrains, from, to, date) {
   let aiSummary = "";
   if (finalTrains.length > 0) {
     const contextLines = finalTrains.slice(0, 3).map(
-      (t) => `- ${t.trainName} (${t.trainNo}) departs ${t.source} at ${t.departureTime}, arrives ${t.destination} at ${t.arrivalTime}. Fare: ₹${t.fare}. Available: ${t.availability?.available ? "Yes" : "No"}`
+      (t) => `- ${t.trainName} (${t.trainNo || t.trainNumber}) departs ${t.source} at ${t.departureTime}, arrives ${t.destination} at ${t.arrivalTime}. Fare: ₹${t.fare}. Available: ${t.availability?.available ? "Yes" : "No"}`
     );
     const context = `Available Trains:\n${contextLines.join("\n")}`;
     const systemPrompt = "You are a helpful travel assistant for RouteWise. Summarize the best train options for the user based ONLY on the provided context. Keep it under 3 sentences, be conversational and helpful.";
@@ -163,14 +205,13 @@ If no trains are found, return {"trains": []}. Be as accurate as possible using 
     try {
       aiSummary = await generateChatResponse(systemPrompt, userPrompt);
     } catch (err) {
-      console.error("OpenAI summary generation failed:", err);
+      console.error("[RAG] Summary generation failed:", err);
       aiSummary = "Here are the top trains we found for your route.";
     }
   } else {
     aiSummary = `We couldn't find any direct trains from ${from} to ${to} for this date.`;
   }
-
-  return { results: finalTrains, aiSummary };
+  return aiSummary;
 }
 
 export async function getTrainSchedule(trainNo) {

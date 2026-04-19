@@ -1,33 +1,43 @@
-import * as cheerio from 'cheerio';
-
 export async function searchWeb(query) {
+  const serperKey = process.env.SERPER_API_KEY;
+  if (!serperKey) {
+    console.warn("[RAG] SERPER_API_KEY is missing. Web search will return empty.");
+    return "";
+  }
+
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const response = await fetch(url, {
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8'
-      }
+        "X-API-KEY": serperKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: query,
+        gl: "in",
+        num: 5,
+      }),
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!response.ok) {
-      throw new Error(`Web search failed with status: ${response.status}`);
+      throw new Error(`Serper API failed with status: ${response.status}`);
     }
 
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    
+    const data = await response.json();
     const results = [];
-    $('.result__snippet').each((i, element) => {
-      if (i < 15) { // Get top 15 snippets for good context
-        results.push($(element).text().trim());
-      }
-    });
 
-    return results.join('\n\n');
+    if (data.organic) {
+      data.organic.forEach((result) => {
+        if (result.snippet) {
+          results.push(result.snippet);
+        }
+      });
+    }
+
+    return results.join("\n\n");
   } catch (error) {
-    console.error("Live Web Search Error:", error);
-    return ""; 
+    console.error("[RAG] Live Web Search Error:", error.message);
+    return "";
   }
 }
