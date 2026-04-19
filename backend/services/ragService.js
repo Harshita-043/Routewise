@@ -8,8 +8,14 @@ import { generateChatResponse, extractStructuredData } from "./llmService.js";
 import { searchWeb } from "./webSearchService.js";
 
 function minutesFromTime(value) {
-  const [hours = "0", minutes = "0"] = String(value).split(":");
-  return Number(hours) * 60 + Number(minutes);
+  if (!value) return 0;
+  const match = String(value).match(/(\d{1,2})[\D]*:[\D]*(\d{2})/);
+  if (!match) return 0;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (String(value).toLowerCase().includes("pm") && hours < 12) hours += 12;
+  if (String(value).toLowerCase().includes("am") && hours === 12) hours = 0;
+  return hours * 60 + minutes;
 }
 
 function buildSearchText({ from, to, date, classType }) {

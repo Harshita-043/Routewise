@@ -154,6 +154,8 @@ router.get("/:trainNo/fare", async (req, res) => {
   return res.json(buildFareBreakdown({ train, classType, date }));
 });
 
+import { getTrainAvailability } from "../services/trainAvailabilityService.js";
+
 /**
  * POST /api/trains/fare/calculate
  * Computes fare breakdown from inline train data (no DB lookup).
@@ -170,7 +172,10 @@ router.post("/fare/calculate", async (req, res) => {
   const syntheticTrain = { trainNo, trainName, classes };
   const journeyDate = String(date || new Date().toISOString().split("T")[0]);
 
-  return res.json(buildFareBreakdown({ train: syntheticTrain, classType, date: journeyDate }));
+  const availability = await getTrainAvailability(syntheticTrain, journeyDate, classType);
+  const breakdown = buildFareBreakdown({ train: syntheticTrain, classType, date: journeyDate, availability });
+
+  return res.json(breakdown);
 });
 
 export default router;

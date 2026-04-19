@@ -41,14 +41,15 @@ function getClassMultiplier(classType) {
 }
 
 export function buildFareBreakdown({ train, classType = "SL", date, availability }) {
-  let selectedClass = train.classes.find((item) => item.type === classType);
+  const classes = train.classes || [];
+  let selectedClass = classes.find((item) => item.type === classType);
   let baseFare = 0;
 
   if (selectedClass) {
     baseFare = Number(selectedClass.baseFare || 0);
   } else {
     // Fallback: estimate baseFare using another class (prefer SL)
-    const refClass = train.classes.find((item) => item.type === "SL") || train.classes[0];
+    const refClass = classes.find((item) => item.type === "SL") || classes[0];
     if (refClass && refClass.baseFare) {
       const refMultiplier = getClassMultiplier(refClass.type);
       const targetMultiplier = getClassMultiplier(classType);

@@ -20,7 +20,8 @@ function availabilityTone(train: TrainSearchResult) {
 // Mirror of fareEngine.js — used to derive the initial display fare from the train prop
 // without an extra network round-trip on first render.
 function deriveInitialFare(train: TrainSearchResult, classType: string): number {
-  const cls = train.classes.find((c) => c.type === classType) ?? train.classes[0];
+  const classes = train.classes || [];
+  const cls = classes.find((c) => c.type === classType) ?? classes[0];
   return cls ? cls.baseFare + (cls.reservationCharge ?? 0) : train.fare;
 }
 
@@ -85,15 +86,15 @@ export default function TrainCard({ train, classType: initialClass, date, onRefr
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-muted/40 p-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Departure</p>
-              <p className="text-lg font-semibold">{train.departureTime}</p>
+              <p className="text-lg font-semibold">{train.departureTime || "N/A"}</p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Arrival</p>
-              <p className="text-lg font-semibold">{train.arrivalTime}</p>
+              <p className="text-lg font-semibold">{train.arrivalTime || "N/A"}</p>
             </div>
             <div className="rounded-xl bg-muted/40 p-3">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Duration</p>
-              <p className="text-lg font-semibold">{train.duration}</p>
+              <p className="text-lg font-semibold">{train.duration || "N/A"}</p>
             </div>
           </div>
 
@@ -112,7 +113,7 @@ export default function TrainCard({ train, classType: initialClass, date, onRefr
           <div className="space-y-2">
             <span className="text-xs uppercase tracking-wide text-slate-400">Select Class</span>
             <div className="flex flex-wrap gap-2">
-              {train.classes.length > 0 ? (
+              {train.classes?.length > 0 ? (
                 train.classes.map((item) => (
                   <button
                     key={item.type}
@@ -180,9 +181,9 @@ export default function TrainCard({ train, classType: initialClass, date, onRefr
           </div>
 
           {/* Availability badge */}
-          <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${availabilityTone(train)}`}>
-            {train.availability?.available
-              ? `${train.availability.seatsLeft} seats left`
+          <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${availabilityTone({ ...train, availability: breakdown?.availability ?? train.availability })}`}>
+            {(breakdown?.availability ?? train.availability)?.available
+              ? `${(breakdown?.availability ?? train.availability)?.seatsLeft} seats left`
               : "Waitlist / unavailable"}
           </div>
 
