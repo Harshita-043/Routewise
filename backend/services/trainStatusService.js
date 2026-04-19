@@ -16,9 +16,10 @@ const FALLBACK_STATIONS = [
 
 function simulateLiveStatus(trainNo, date) {
   const seed = createSeedNumber(`${trainNo}${date}`);
+  const todayStr = new Date().toISOString().split("T")[0];
   return {
     trainNo,
-    date,
+    date: todayStr,
     delayMinutes: seed % 48,
     currentStation: FALLBACK_STATIONS[seed % FALLBACK_STATIONS.length],
     currentLocation: {
@@ -39,11 +40,13 @@ Return a JSON object strictly matching this schema:
   "delayMinutes": 0,
   "status": "One-line human-readable status e.g. 'Running on time' or 'Running 25 min late'",
   "lat": 22.5,
-  "lng": 78.5
+  "lng": 78.5,
+  "actualDate": "YYYY-MM-DD" // The actual journey start date this live status corresponds to.
 }
 Rules:
 - If the train is on time, set delayMinutes to 0.
 - lat/lng should be approximate coordinates of the currentStation (India range: lat 8-37, lng 68-98).
+- actualDate should be the journey date the search results are tracking. If unclear, use today's date.
 - If no reliable data is found, return null.
 - Do NOT hallucinate. Only use data present in the context.`;
 
@@ -67,9 +70,14 @@ export async function getTrainLiveStatus(trainNo, date) {
         extracted.currentStation.length > 1
       ) {
         console.log(`[LiveStatus] RAG extracted station: ${extracted.currentStation}`);
+        
+        // Use extracted date, default to today's date if missing (because live status implies currently running)
+        const todayStr = new Date().toISOString().split("T")[0];
+        const displayDate = extracted.actualDate || todayStr;
+
         return {
           trainNo,
-          date,
+          date: displayDate,
           delayMinutes: Number(extracted.delayMinutes ?? 0),
           currentStation: extracted.currentStation,
           currentLocation: {
