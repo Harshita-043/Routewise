@@ -61,7 +61,6 @@ interface RouteResult {
 type TransportKey = "bus" | "taxi" | "train" | "carpool";
 type SortKey = "cheapest" | "fastest" | "greenest";
 
-const today = new Date().toISOString().split("T")[0];
 const CO2_PER_MODE = {
   bus: 5.2,
   taxi: 17.8,
@@ -82,6 +81,7 @@ function parseDurationTextToMinutes(duration: string) {
 }
 
 export default function TransitHome() {
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -110,9 +110,17 @@ export default function TransitHome() {
       setSearchResult(parsed.searchResult || null);
       setTrainResults(parsed.trainResults || []);
       setNearbyStations(parsed.nearbyStations || []);
-      setLiveStatus(parsed.liveStatus || null);
       setAiSummary(parsed.aiSummary || null);
       setFilters(parsed.filters || { date: today, classType: "SL" });
+
+      if (parsed.trainResults?.[0]) {
+        const todayStr = new Date().toISOString().split("T")[0];
+        fetchTrainLiveStatus(parsed.trainResults[0].trainNo, todayStr)
+          .then((status) => setLiveStatus(status))
+          .catch(() => setLiveStatus(parsed.liveStatus || null));
+      } else {
+        setLiveStatus(parsed.liveStatus || null);
+      }
 
       requestAnimationFrame(() => {
         document.getElementById("estimates")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -143,7 +151,7 @@ export default function TransitHome() {
   }, []);
 
   useEffect(() => {
-    if (!routeResult || !searchResult) {
+    if (!routeResult || !searchResult || trainResults.length === 0) {
       return;
     }
 
@@ -187,7 +195,8 @@ export default function TransitHome() {
     );
 
     if (trainResponse.results[0]) {
-      setLiveStatus(await fetchTrainLiveStatus(trainResponse.results[0].trainNo, nextFilters.date).catch(() => null));
+      const todayStr = new Date().toISOString().split("T")[0];
+      setLiveStatus(await fetchTrainLiveStatus(trainResponse.results[0].trainNo, todayStr).catch(() => null));
     } else {
       setLiveStatus(null);
     }
@@ -569,8 +578,13 @@ export default function TransitHome() {
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <RadioTower className="h-5 w-5 text-primary" />
-                    <h3 className="text-xl font-bold">Live Train Status</h3>
-                    <span className="text-sm text-muted-foreground">· {trainResults[0]?.trainName ?? liveStatus.trainNo}</span>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold">Live Train Status</h3>
+                        <span className="text-sm text-muted-foreground">· {trainResults[0]?.trainName ?? liveStatus.trainNo}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Status for: {today}</span>
+                    </div>
                   </div>
                   {/* RAG vs simulated badge */}
                   {liveStatus.source === "rag" ? (
@@ -609,8 +623,13 @@ export default function TransitHome() {
                     </span>
                   </div>
                   <div className="rounded-xl bg-muted/30 p-4">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Journey Date</p>
-                    <p className="text-lg font-semibold">{liveStatus.date}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Your Journey Date</p>
+                    <p className="text-lg font-semibold">{filters?.date || "N/A"}</p>
+                    {liveStatus.date && liveStatus.date !== filters?.date && (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        Live Status Date: {liveStatus.date}
+                      </p>
+                    )}
                   </div>
                 </div>
               </section>

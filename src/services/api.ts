@@ -121,7 +121,7 @@ export interface PnrStatusResponse {
 
 export interface TrainLiveStatus {
   trainNo: string;
-  date: string;
+  date: string | null | undefined;
   delayMinutes: number;
   currentStation: string;
   currentLocation: {

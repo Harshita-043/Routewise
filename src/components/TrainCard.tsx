@@ -58,7 +58,20 @@ export default function TrainCard({ train, classType: initialClass, date, onRefr
         setFareData(data);
       } catch (err) {
         setFetchError(err instanceof Error ? err.message : "Could not fetch fare");
-        setFareData(null);
+        const fallbackCls = train.classes?.find((c) => c.type === cls) ?? train.classes?.[0];
+        setFareData(fallbackCls ? {
+          trainNo: train.trainNo,
+          trainName: train.trainName,
+          classType: cls,
+          baseFare: fallbackCls.baseFare,
+          reservationCharge: fallbackCls.reservationCharge ?? 0,
+          superfastSurcharge: 0,
+          tatkalSurcharge: 0,
+          gst: 0,
+          gstRate: 0,
+          total: fallbackCls.baseFare + (fallbackCls.reservationCharge ?? 0),
+          availability: null,
+        } : null);
       } finally {
         setIsFetching(false);
       }
