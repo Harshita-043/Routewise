@@ -10,29 +10,33 @@ async function checkTrainAlerts() {
   const alerts = await TrainAlert.find().lean();
 
   for (const alert of alerts) {
-    const train = await TrainSchedule.findOne({ trainNo: alert.trainNo }).lean();
+    try {
+      const train = await TrainSchedule.findOne({ trainNo: alert.trainNo }).lean();
 
-    if (!train) {
-      continue;
+      if (!train) {
+        continue;
+      }
+
+      const availability = await getTrainAvailability(train, alert.date, alert.classType);
+      const shouldNotify =
+        availability.currentFare <= alert.targetFare ||
+        (alert.notifyOnSeatOpen && availability.available);
+
+      if (!shouldNotify) {
+        continue;
+      }
+
+      console.info(
+        `[Train Alert] ${alert.email}: ${alert.trainNo} ${alert.date} ${alert.classType} fare ${availability.currentFare} seats ${availability.seatsLeft}`,
+      );
+
+      await TrainAlert.updateOne(
+        { _id: alert._id },
+        { $set: { lastNotifiedAt: new Date() } },
+      );
+    } catch (alertErr) {
+      console.error(`[Train Alert] Failed to process alert ${alert._id} (${alert.trainNo}):`, alertErr.message);
     }
-
-    const availability = await getTrainAvailability(train, alert.date, alert.classType);
-    const shouldNotify =
-      availability.currentFare <= alert.targetFare ||
-      (alert.notifyOnSeatOpen && availability.available);
-
-    if (!shouldNotify) {
-      continue;
-    }
-
-    console.info(
-      `[Train Alert] ${alert.email}: ${alert.trainNo} ${alert.date} ${alert.classType} fare ${availability.currentFare} seats ${availability.seatsLeft}`,
-    );
-
-    await TrainAlert.updateOne(
-      { _id: alert._id },
-      { $set: { lastNotifiedAt: new Date() } },
-    );
   }
 }
 

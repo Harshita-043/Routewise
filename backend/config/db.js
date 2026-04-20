@@ -17,7 +17,7 @@ export async function connectDatabase() {
   } catch (error) {
     const details = error instanceof Error ? error.message : "Unknown MongoDB error";
     throw new Error(
-      `MongoDB connection failed. Check Atlas credentials, network access allowlist, and MONGODB_URI. ${details}`,
+      `MongoDB connection failed. Check Atlas credentials, network access allowlist, and MONGO_URI / MONGODB_URI env vars. ${details}`,
     );
   }
 

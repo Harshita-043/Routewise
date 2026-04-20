@@ -55,14 +55,19 @@ export default function BookingPage() {
       });
   }, [navigate]);
 
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
   useEffect(() => {
     const loadOptions = async () => {
       setIsLoading(true);
+      setBookingError(null);
       try {
         const response = await searchTransport({ from, to, date, type: transportType });
         const mergedOptions = [...response.results[transportType], ...response.suggestions[transportType]];
         setOptions(mergedOptions);
         setSelectedOption(mergedOptions[0] || null);
+      } catch (err) {
+        setBookingError(err instanceof Error ? err.message : "Could not load transport options");
       } finally {
         setIsLoading(false);
       }
@@ -102,6 +107,7 @@ export default function BookingPage() {
   const completeBooking = async () => {
     if (!selectedOption) return;
     setIsSubmitting(true);
+    setBookingError(null);
 
     try {
       const booking = await createBooking({
@@ -118,6 +124,8 @@ export default function BookingPage() {
 
       localStorage.setItem("routewise-user", JSON.stringify(user));
       navigate(`/payment-success?bookingId=${booking.bookingId}&type=${transportType}`);
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : "Booking failed. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -139,12 +147,20 @@ export default function BookingPage() {
           </div>
         </div>
 
+        {bookingError && (
+          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {bookingError}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-[1.2fr,0.8fr] gap-6">
           <div className="space-y-6">
             <section className="bg-card rounded-2xl border border-border/50 p-5">
               <h2 className="font-semibold mb-4">1. Select an available option</h2>
               {isLoading ? (
                 <p className="text-muted-foreground">Loading options...</p>
+              ) : bookingError && options.length === 0 ? (
+                <p className="text-muted-foreground">Could not load options — check your connection and try again.</p>
               ) : options.length === 0 ? (
                 <p className="text-muted-foreground">No direct option found right now for this mode.</p>
               ) : (

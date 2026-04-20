@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { connectDatabase } from "../config/db.js";
 import { seedDatabase } from "../services/seedService.js";
 

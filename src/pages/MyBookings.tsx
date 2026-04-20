@@ -41,11 +41,16 @@ export default function MyBookings() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadBookings = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchBookings();
       setBookings(data);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Could not load bookings");
     } finally {
       setIsLoading(false);
     }
@@ -107,9 +112,12 @@ export default function MyBookings() {
           <p className="text-sm text-muted-foreground">{currentUser?.email || "Loading user..."}</p>
         </div>
 
+        {loadError && (
+          <p className="mb-4 text-center text-sm text-destructive">{loadError}</p>
+        )}
         {isLoading ? (
           <div className="text-center text-muted-foreground">Loading bookings...</div>
-        ) : bookings.length === 0 ? (
+        ) : bookings.length === 0 && !loadError ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
               <Calendar className="w-12 h-12 text-muted-foreground" />

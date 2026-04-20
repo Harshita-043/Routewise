@@ -13,7 +13,15 @@ import { initializeTrainData, startTrainScheduler } from "./services/trainSchedu
 
 const app = express();
 
-app.use(cors());
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+app.use(
+  cors({
+    origin: CORS_ORIGIN
+      ? CORS_ORIGIN.split(",").map((o) => o.trim())
+      : true, // permissive in dev when CORS_ORIGIN is not set
+    credentials: true,
+  }),
+);
 app.use(express.json());
 
 // Request logging for debugging

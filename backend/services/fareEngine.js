@@ -63,7 +63,8 @@ export function buildFareBreakdown({ train, classType = "SL", date, availability
   const reservationCharge = Number(selectedClass?.reservationCharge ?? getReservationCharge(classType));
   const superfastSurcharge = /superfast|rajdhani|shatabdi/i.test(train.trainName) ? 45 : 0;
 
-  const tatkalEligible = Number.isFinite(daysUntilJourney(date)) && daysUntilJourney(date) <= 2;
+  const daysLeft = daysUntilJourney(date);
+  const tatkalEligible = Number.isFinite(daysLeft) && daysLeft <= 2;
   const tatkalSurcharge = tatkalEligible ? Math.round(baseFare * getTatkalRate(classType)) : 0;
   const subtotal = baseFare + reservationCharge + superfastSurcharge + tatkalSurcharge;
   const gstRate = subtotal < 250 ? 0.05 : 0.12;
