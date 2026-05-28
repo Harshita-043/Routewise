@@ -6,7 +6,7 @@ import { acceptCarpoolRequest, fetchCurrentUser, fetchDriverCarpools, fetchDrive
 
 export default function DriverDashboard() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [, setCurrentUser] = useState<AuthUser | null>(null);
   const [activeRides, setActiveRides] = useState<ActiveCarpool[]>([]);
   const [requests, setRequests] = useState<CarpoolRequestResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -144,11 +144,10 @@ export default function DriverDashboard() {
                         <div>
                           <h3 className="font-semibold text-lg">{req.passengerId?.name || "Passenger"}</h3>
                           <p className="text-sm text-muted-foreground">{req.passengerId?.phone || "No phone"}</p>
-                          <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${
-                            req?.status === "accepted" ? "bg-green-100 text-green-700"
-                            : req?.status === "pending" ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                          }`}>
+                          <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${req?.status === "accepted" ? "bg-green-100 text-green-700"
+                              : req?.status === "pending" ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700"
+                            }`}>
                             {(req?.status || "pending").charAt(0).toUpperCase() + (req?.status || "pending").slice(1)}
                           </span>
                         </div>
