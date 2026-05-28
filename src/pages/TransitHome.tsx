@@ -128,7 +128,7 @@ export default function TransitHome() {
     } catch {
       sessionStorage.removeItem(SEARCH_STATE_KEY);
     }
-  }, [searchParams]);
+  }, [searchParams, today]);
 
   useEffect(() => {
     const token = localStorage.getItem("routewise-token");
@@ -387,9 +387,9 @@ export default function TransitHome() {
                 </Button>
               )}
               <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                <Link to="/driver-registration">
+                <Link to={currentUser ? "/driver-dashboard" : "/driver-registration"}>
                   <BriefcaseBusiness className="mr-2 h-4 w-4" />
-                  Driver Portal
+                  {currentUser ? "Driver Dashboard" : "Driver Portal"}
                 </Link>
               </Button>
             </nav>

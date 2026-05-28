@@ -232,7 +232,7 @@ async function requestJson<T>(input: string, init: RequestInit, fallbackMessage:
       response = await fetch(url, mergedInit);
       clearTimeout(timeoutId);
       break;
-    } catch (err) {
+    } catch {
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
       }
@@ -294,6 +294,78 @@ export async function createBooking(payload: BookingPayload) {
   );
 }
 
+export interface CarpoolRequestPayload {
+  rideId: string;
+  source: string;
+  destination: string;
+  seatsRequested: number;
+  totalAmount: number;
+  passengerDetails: Array<{ name: string; age: number; gender: string }>;
+  date: string;
+}
+
+export interface CarpoolRequestResponse {
+  _id: string;
+  rideId: unknown;
+  passengerId?: { _id: string; name: string; phone: string };
+  driverId?: { _id: string; name: string; phone: string };
+  source: string;
+  destination: string;
+  seatsRequested: number;
+  totalAmount: number;
+  passengerDetails: Array<{ name: string; age: number; gender: string }>;
+  rideDate: string;
+  status: "pending" | "accepted" | "rejected" | "cancelled";
+}
+
+export interface ActiveCarpool {
+  _id: string;
+  driverId: string;
+  userId: string;
+  route: { source: string; destination: string };
+  availableSeats: number;
+  rideDate: string;
+  departureTime: string;
+  pricePerSeat: number;
+  startLocationName: string;
+}
+
+export async function createCarpoolRequest(payload: CarpoolRequestPayload) {
+  return requestJson<CarpoolRequestResponse>(
+    "/api/carpool/requests",
+    {
+      method: "POST",
+      headers: withAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(payload),
+    },
+    "Failed to send join request"
+  );
+}
+
+export async function fetchPassengerRequests() {
+  return requestJson<CarpoolRequestResponse[]>("/api/carpool/requests/passenger", { headers: withAuthHeaders() }, "Failed to fetch requests");
+}
+
+export async function fetchDriverRequests() {
+  return requestJson<CarpoolRequestResponse[]>("/api/carpool/requests/driver", { headers: withAuthHeaders() }, "Failed to fetch driver requests");
+}
+
+export async function fetchDriverCarpools() {
+  return requestJson<ActiveCarpool[]>("/api/carpool/driver/active-rides", { headers: withAuthHeaders() }, "Failed to fetch active rides");
+}
+
+export async function acceptCarpoolRequest(id: string) {
+  return requestJson<{ request: CarpoolRequestResponse, booking: unknown }>(`/api/carpool/requests/${id}/accept`, { method: "PATCH", headers: withAuthHeaders() }, "Failed to accept request");
+}
+
+export async function rejectCarpoolRequest(id: string) {
+  return requestJson<CarpoolRequestResponse>(`/api/carpool/requests/${id}/reject`, { method: "PATCH", headers: withAuthHeaders() }, "Failed to reject request");
+}
+
+export async function cancelCarpoolRequest(id: string) {
+  return requestJson<CarpoolRequestResponse>(`/api/carpool/requests/${id}/cancel-passenger`, { method: "PATCH", headers: withAuthHeaders() }, "Failed to cancel request");
+}
+
 export async function fetchBookings() {
   return requestJson<
     Array<{
@@ -333,7 +405,7 @@ export async function registerDriver(payload: Record<string, unknown>) {
     "/api/register-driver",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(payload),
     },
     "Driver registration failed",

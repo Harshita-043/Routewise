@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, CalendarDays, CheckCircle2, CreditCard, MapPin, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createBooking, fetchCurrentUser, searchTransport, type AuthUser, type SearchOption } from "@/services/api";
+import { createBooking, createCarpoolRequest, fetchCurrentUser, searchTransport, type AuthUser, type SearchOption } from "@/services/api";
 
 type TransportType = "bus" | "train" | "taxi" | "carpool";
 
@@ -110,20 +110,34 @@ export default function BookingPage() {
     setBookingError(null);
 
     try {
-      const booking = await createBooking({
-        transportType,
-        transportId: selectedOption.id,
-        source: selectedOption.source,
-        destination: selectedOption.destination,
-        date,
-        passengers,
-        seats: selectedSeats,
-        amount: totalAmount,
-        passengerDetails: travellers,
-      });
+      if (transportType === "carpool") {
+        await createCarpoolRequest({
+          rideId: selectedOption.id,
+          source: selectedOption.source,
+          destination: selectedOption.destination,
+          seatsRequested: passengers,
+          totalAmount: totalAmount,
+          passengerDetails: travellers,
+          date,
+        });
+        localStorage.setItem("routewise-user", JSON.stringify(user));
+        navigate("/my-bookings");
+      } else {
+        const booking = await createBooking({
+          transportType,
+          transportId: selectedOption.id,
+          source: selectedOption.source,
+          destination: selectedOption.destination,
+          date,
+          passengers,
+          seats: selectedSeats,
+          amount: totalAmount,
+          passengerDetails: travellers,
+        });
 
-      localStorage.setItem("routewise-user", JSON.stringify(user));
-      navigate(`/payment-success?bookingId=${booking.bookingId}&type=${transportType}`);
+        localStorage.setItem("routewise-user", JSON.stringify(user));
+        navigate(`/payment-success?bookingId=${booking.bookingId}&type=${transportType}`);
+      }
     } catch (err) {
       setBookingError(err instanceof Error ? err.message : "Booking failed. Please try again.");
     } finally {
@@ -285,7 +299,7 @@ export default function BookingPage() {
                     onClick={completeBooking}
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
-                    {isSubmitting ? "Confirming..." : "Confirm Booking"}
+                    {isSubmitting ? "Processing..." : transportType === "carpool" ? "Send Join Request" : "Confirm Booking"}
                   </Button>
                 </div>
               ) : (

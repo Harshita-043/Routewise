@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cancelBooking, fetchBookings, fetchCurrentUser, type AuthUser } from "@/services/api";
+import { cancelBooking, cancelCarpoolRequest, fetchBookings, fetchCurrentUser, fetchPassengerRequests, type AuthUser, type CarpoolRequestResponse } from "@/services/api";
 
 interface BookingRecord {
   _id: string;
@@ -39,16 +39,22 @@ export default function MyBookings() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
+  const [requests, setRequests] = useState<CarpoolRequestResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const loadBookings = async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const data = await fetchBookings();
-      setBookings(data);
+      const [data, reqData] = await Promise.all([
+        fetchBookings(),
+        fetchPassengerRequests()
+      ]);
+      setBookings(Array.isArray(data) ? data : []);
+      setRequests(Array.isArray(reqData) ? reqData.filter((r) => r.status !== "accepted") : []);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Could not load bookings");
     } finally {
@@ -76,12 +82,31 @@ export default function MyBookings() {
   }, [navigate]);
 
   const handleCancel = async (id: string) => {
-    await cancelBooking(id);
-    setBookings((current) =>
-      current.map((booking) =>
-        booking._id === id ? { ...booking, status: "cancelled" } : booking,
-      ),
-    );
+    setCancelError(null);
+    try {
+      await cancelBooking(id);
+      setBookings((current) =>
+        current.map((booking) =>
+          booking._id === id ? { ...booking, status: "cancelled" } : booking,
+        ),
+      );
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Could not cancel booking");
+    }
+  };
+
+  const handleCancelRequest = async (id: string) => {
+    setCancelError(null);
+    try {
+      await cancelCarpoolRequest(id);
+      setRequests((current) =>
+        current.map((req) =>
+          req._id === id ? { ...req, status: "cancelled" } : req,
+        ),
+      );
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Could not cancel request");
+    }
   };
 
   return (
@@ -115,9 +140,12 @@ export default function MyBookings() {
         {loadError && (
           <p className="mb-4 text-center text-sm text-destructive">{loadError}</p>
         )}
+        {cancelError && (
+          <p className="mb-4 text-center text-sm text-destructive">{cancelError}</p>
+        )}
         {isLoading ? (
           <div className="text-center text-muted-foreground">Loading bookings...</div>
-        ) : bookings.length === 0 && !loadError ? (
+        ) : bookings.length === 0 && requests.length === 0 && !loadError ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
               <Calendar className="w-12 h-12 text-muted-foreground" />
@@ -194,6 +222,78 @@ export default function MyBookings() {
                       <XCircle className="w-4 h-4 mr-1" />
                       Cancel
                     </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {requests.map((req) => (
+              <div
+                key={req._id}
+                className={`bg-card rounded-xl border border-border/50 p-5 shadow-sm transition-all hover:shadow-md ${
+                  req.status === "cancelled" || req.status === "rejected" ? "opacity-60" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                      <Users className="w-5 h-5 text-transport-carpool" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Carpool Request</h3>
+                      <p className="text-xs text-muted-foreground">Driver: {req.driverId?.name || "Unknown"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      req?.status === "accepted"
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : req?.status === "pending"
+                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    }`}>
+                      {(req?.status || "pending").charAt(0).toUpperCase() + (req?.status || "pending").slice(1)}
+                    </span>
+                    <span className="text-lg font-bold text-primary">₹{req.totalAmount}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm mb-4">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <MapPin className="w-4 h-4 text-primary shrink-0" />
+                    <span className="truncate">{req.source}</span>
+                  </div>
+                  <span className="text-muted-foreground">→</span>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <MapPin className="w-4 h-4 text-secondary shrink-0" />
+                    <span className="truncate">{req.destination}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Route className="w-4 h-4" />
+                      {req.seatsRequested} passenger(s)
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {req?.rideDate ? new Date(req.rideDate).toLocaleDateString() : "Unknown date"}
+                    </span>
+                  </div>
+                  {req?.status === "pending" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCancelRequest(req._id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                  )}
+                  {req?.status !== "pending" && (
+                    <p className="text-xs text-muted-foreground">Note: Carpool requests are handled manually by the driver.</p>
                   )}
                 </div>
               </div>

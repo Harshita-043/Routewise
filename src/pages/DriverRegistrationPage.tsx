@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router";
 import { ArrowLeft, BriefcaseBusiness, Bus, Car, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { registerDriver } from "@/services/api";
+import { registerDriver, fetchCurrentUser } from "@/services/api";
 
 const weekDayOptions = [
   { value: "monday", label: "Mon" },
@@ -15,6 +15,7 @@ const weekDayOptions = [
 ];
 
 export default function DriverRegistrationPage() {
+  const navigate = useNavigate();
   const [transportType, setTransportType] = useState("bus");
   const [form, setForm] = useState({
     name: "",
@@ -25,16 +26,38 @@ export default function DriverRegistrationPage() {
     source: "",
     destination: "",
     departureTime: "",
+    rideDate: new Date().toISOString().split("T")[0],
     availableSeats: "4",
     price: "400",
     pricePerKm: "15",
     operatingDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
   });
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("routewise-token");
+    if (!token) {
+      navigate("/auth?redirect=%2Fdriver-registration");
+      return;
+    }
+    fetchCurrentUser().catch(() => {
+      localStorage.removeItem("routewise-token");
+      navigate("/auth?redirect=%2Fdriver-registration");
+    });
+  }, [navigate]);
 
   const submit = async () => {
-    const result = await registerDriver({ ...form, transportType });
-    setMessage(`${result.driver.name} registered successfully.`);
+    setIsSubmitting(true);
+    try {
+      const result = await registerDriver({ ...form, transportType });
+      setMessage(`${result.driver.name} registered successfully. Redirecting...`);
+      setTimeout(() => navigate("/driver-dashboard"), 1500);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to register driver. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -81,7 +104,7 @@ export default function DriverRegistrationPage() {
               ["phone", "Phone"],
               ["source", "Source"],
               ["destination", "Destination"],
-              ["departureTime", "Departure time"],
+              ["departureTime", "Departure time (HH:MM)"],
             ].map(([key, label]) => (
               <input
                 key={key}
@@ -91,6 +114,16 @@ export default function DriverRegistrationPage() {
                 className="h-11 rounded-lg border border-border bg-muted/40 px-4 outline-none focus:ring-2 focus:ring-primary/30"
               />
             ))}
+
+            {transportType === "carpool" && (
+              <input
+                type="date"
+                min={new Date().toISOString().split("T")[0]}
+                value={form.rideDate}
+                onChange={(event) => setForm((current) => ({ ...current, rideDate: event.target.value }))}
+                className="h-11 rounded-lg border border-border bg-muted/40 px-4 outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            )}
 
             {(transportType === "taxi" || transportType === "carpool") && (
               <input
@@ -156,7 +189,9 @@ export default function DriverRegistrationPage() {
               <BriefcaseBusiness className="w-4 h-4" />
               New registrations appear in search results automatically.
             </p>
-            <Button onClick={submit}>Register Driver</Button>
+            <Button onClick={submit} disabled={isSubmitting}>
+              {isSubmitting ? "Registering..." : "Register Driver"}
+            </Button>
           </div>
 
           {message && <p className="mt-4 text-sm text-primary font-medium">{message}</p>}

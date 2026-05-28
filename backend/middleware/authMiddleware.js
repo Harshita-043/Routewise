@@ -18,6 +18,7 @@ export async function requireAuth(req, res, next) {
     }
 
     req.user = {
+      _id: user._id, // ObjectId — required by controllers for Mongoose schema fields
       id: user._id.toString(),
       name: user.name,
       email: user.email,

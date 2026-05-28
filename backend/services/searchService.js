@@ -191,7 +191,7 @@ function buildCarpoolResult(ride, fromPoint, toPoint, matchType) {
     label: `Carpool with ${ride.driverId}`,
     source: ride.route.source,
     destination: ride.route.destination,
-    departureTime: ride.time,
+    departureTime: ride.departureTime,
     seatsAvailable: ride.availableSeats,
     amount: ride.pricePerSeat,
     durationText: formatDuration(estimateDurationHours(fromPoint, toPoint, 60)),
@@ -240,7 +240,7 @@ export async function searchTransportOptions({ from, to, type, date }) {
     Train.find().lean(),
     Bus.find().lean(),
     Taxi.find({ availability: "online" }).lean(),
-    Carpool.find().lean(),
+    Carpool.find({ status: "active" }).lean(),
     Driver.find().lean(),
   ]);
 
@@ -312,6 +312,19 @@ export async function searchTransportOptions({ from, to, type, date }) {
 
   if (!type || type === "carpool") {
     carpools.forEach((ride) => {
+      if (date && ride.rideDate !== date) {
+        return;
+      }
+      
+      const rideDateTime = new Date(`${ride.rideDate}T${ride.departureTime}:00`);
+      if (rideDateTime < new Date()) {
+        return; // Expired ride
+      }
+
+      if (ride.availableSeats <= 0) {
+        return; // Fully booked
+      }
+
       const sourceMatch = normalizePlace(ride.route.source) === normalizePlace(fromPoint.name);
       const destinationMatch = normalizePlace(ride.route.destination) === normalizePlace(toPoint.name);
 

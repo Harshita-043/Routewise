@@ -4,6 +4,7 @@ import BookingPage from "@/pages/BookingPage";
 import BookingHistory from "@/pages/MyBookings";
 import AuthPage from "@/pages/AuthPage";
 import DriverRegistrationPage from "@/pages/DriverRegistrationPage";
+import DriverDashboard from "@/pages/DriverDashboard";
 import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/booking/:type" element={<BookingPage />} />
         <Route path="/my-bookings" element={<BookingHistory />} />
         <Route path="/driver-registration" element={<DriverRegistrationPage />} />
+        <Route path="/driver-dashboard" element={<DriverDashboard />} />
         <Route path="/payment-success" element={<PaymentSuccessPage />} />
       </Routes>
     </Router>

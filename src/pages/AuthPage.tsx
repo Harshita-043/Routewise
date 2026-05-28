@@ -21,6 +21,22 @@ export default function AuthPage() {
 
   const submit = async () => {
     setError("");
+    
+    if (mode === "signup" && (!form.name || !form.phone)) {
+      setError("Name and phone number are required.");
+      return;
+    }
+    
+    if (!form.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    
+    if (!form.password || form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

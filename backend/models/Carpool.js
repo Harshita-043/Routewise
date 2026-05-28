@@ -30,12 +30,15 @@ const pointSchema = new mongoose.Schema(
 const carpoolSchema = new mongoose.Schema(
   {
     driverId: { type: String, required: true, index: true, trim: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     route: { type: routeSchema, required: true },
     availableSeats: { type: Number, required: true, min: 0 },
-    time: { type: String, required: true, trim: true },
+    rideDate: { type: String, required: true }, // Store as string "YYYY-MM-DD" for easy matching
+    departureTime: { type: String, required: true, trim: true },
     pricePerSeat: { type: Number, required: true, min: 0 },
     startLocationName: { type: String, trim: true },
     startLocation: { type: pointSchema },
+    status: { type: String, enum: ["active", "completed", "cancelled"], default: "active" },
   },
   { timestamps: true },
 );
