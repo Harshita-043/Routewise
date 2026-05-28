@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -45,7 +45,7 @@ export default function MyBookings() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  const loadBookings = async () => {
+  const loadBookings = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
     try {
@@ -60,7 +60,7 @@ export default function MyBookings() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []); // stable — only calls API functions and state setters
 
   useEffect(() => {
     const token = localStorage.getItem("routewise-token");

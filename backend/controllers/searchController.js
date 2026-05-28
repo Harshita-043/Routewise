@@ -2,25 +2,58 @@ import { getPlaceAutocomplete } from "../services/mapsService.js";
 import { getFallbackLocationSuggestions } from "../utils/fallbackModule.js";
 import { searchTransportOptions } from "../services/searchService.js";
 
+/**
+ * GET /api/geocode?q=<query>
+ *
+ * Resolution order:
+ *  1. Google Places autocomplete  (returns null on any failure)
+ *  2. Local fallback city list    (always succeeds)
+ *
+ * The response is ALWAYS:
+ *   { source: "api"|"fallback", results: [{ display_name, lat, lon }, ...] }
+ */
 export async function getGeocodeSuggestions(req, res) {
   const query = req.query.q;
 
-  if (!query) {
+  if (!query || query.trim().length === 0) {
     return res.status(400).json({ error: "Query parameter q is required" });
   }
 
+  // ── 1. Try Google Places (never throws — returns null on any failure) ──────
+  let apiResults = null;
   try {
-    const apiResults = await getPlaceAutocomplete(query);
-    if (apiResults && apiResults.length > 0) {
-      return res.json({ source: "api", results: apiResults });
-    } else {
-      const fallback = getFallbackLocationSuggestions(query, "API returned zero results");
-      return res.json({ source: "fallback", results: fallback });
-    }
-  } catch (err) {
-    const fallback = getFallbackLocationSuggestions(query, `API error: ${err.message}`);
-    return res.json({ source: "fallback", results: fallback });
+    apiResults = await getPlaceAutocomplete(query);
+  } catch {
+    // Safety net: getPlaceAutocomplete should never throw, but just in case.
+    apiResults = null;
   }
+
+  // Only use Google results if they exist AND contain usable lat/lon data.
+  // The Places autocomplete endpoint does NOT return coordinates, so results
+  // from Google will NOT have lat/lon — always use the fallback for now.
+  // (If a Place Details lookup is added later, remove this filter.)
+  const validApiResults =
+    Array.isArray(apiResults) &&
+    apiResults.length > 0 &&
+    apiResults.every((r) => r.lat !== undefined && r.lon !== undefined)
+      ? apiResults
+      : null;
+
+  if (validApiResults) {
+    console.log(`[geocode] Google Places returned ${validApiResults.length} result(s) for "${query}".`);
+    return res.json({ source: "api", results: validApiResults });
+  }
+
+  // ── 2. Fallback — always returns valid { display_name, lat, lon } objects ──
+  const reason = apiResults === null
+    ? "Google Places unavailable or key missing"
+    : "Google Places returned results without coordinates";
+
+  const fallback = getFallbackLocationSuggestions(query, reason);
+
+  console.log(`[geocode] Fallback returned ${fallback.length} result(s) for "${query}" (reason: ${reason}).`);
+
+  return res.json({ source: "fallback", results: fallback });
 }
 
 export async function getRouteSummary(req, res) {

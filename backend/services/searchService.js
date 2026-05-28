@@ -182,13 +182,14 @@ function buildBusResult(bus, fromPoint, toPoint, driver, matchType, alternative 
   };
 }
 
-function buildCarpoolResult(ride, fromPoint, toPoint, matchType) {
+function buildCarpoolResult(ride, fromPoint, toPoint, matchType, driverMap) {
   const distance = haversineDistanceKm(fromPoint, toPoint);
+  const driverName = driverMap?.get(ride.driverId)?.name || "Driver";
   return {
     id: ride._id,
     code: ride.driverId,
     transportType: "carpool",
-    label: `Carpool with ${ride.driverId}`,
+    label: `Carpool with ${driverName}`,
     source: ride.route.source,
     destination: ride.route.destination,
     departureTime: ride.departureTime,
@@ -312,7 +313,9 @@ export async function searchTransportOptions({ from, to, type, date }) {
 
   if (!type || type === "carpool") {
     carpools.forEach((ride) => {
-      if (date && ride.rideDate !== date) {
+      // Normalise to "YYYY-MM-DD" — rideDate may be stored as full ISO string
+      const rideDateStr = ride.rideDate ? String(ride.rideDate).slice(0, 10) : null;
+      if (date && rideDateStr !== date) {
         return;
       }
       
@@ -329,7 +332,7 @@ export async function searchTransportOptions({ from, to, type, date }) {
       const destinationMatch = normalizePlace(ride.route.destination) === normalizePlace(toPoint.name);
 
       if (sourceMatch && destinationMatch) {
-        results.carpool.push(buildCarpoolResult(ride, fromPoint, toPoint, "direct"));
+        results.carpool.push(buildCarpoolResult(ride, fromPoint, toPoint, "direct", driverMap));
         return;
       }
 
@@ -338,7 +341,7 @@ export async function searchTransportOptions({ from, to, type, date }) {
         : 99;
 
       if (sourceDistance <= 20) {
-        suggestions.carpool.push(buildCarpoolResult(ride, fromPoint, toPoint, "alternate"));
+        suggestions.carpool.push(buildCarpoolResult(ride, fromPoint, toPoint, "alternate", driverMap));
       }
     });
   }

@@ -16,19 +16,31 @@ interface RouteSearchProps {
   initialDestination?: Location | null;
 }
 
+// In production the frontend may be served from a different origin than the
+// backend.  Use VITE_API_BASE_URL when set (e.g. on Render / Railway) so the
+// relative /api/... URL is prefixed with the backend's public URL.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || "";
+
 const fetchLocationSuggestions = async (query: string, signal?: AbortSignal): Promise<Location[]> => {
-  const apiUrl = `/api/geocode?q=${encodeURIComponent(query)}`;
+  const apiUrl = `${API_BASE}/api/geocode?q=${encodeURIComponent(query)}`;
 
   try {
     const response = await fetch(apiUrl, { signal });
+
+    // Non-2xx: backend is reachable but returned an error — use empty list
     if (!response.ok) return [];
 
     const data = await response.json();
-    // data structure is { source: 'api' | 'fallback', results: [...] }
-    const results = data?.results || [];
+
+    // Backend always returns { source: 'api'|'fallback', results: [...] }
+    // Each result is guaranteed to have { display_name, lat, lon }
+    const results: Location[] = data?.results ?? [];
     return Array.isArray(results) ? results.slice(0, 5) : [];
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') throw err;
+    // Re-throw AbortError so the debounce cleanup works correctly
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    // Any other fetch/network error — silently return empty list
+    console.warn("[RouteSearch] Geocode fetch failed:", (err as Error).message);
     return [];
   }
 };

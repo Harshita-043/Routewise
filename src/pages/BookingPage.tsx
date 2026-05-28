@@ -29,6 +29,14 @@ export default function BookingPage() {
   const transportType = (type || "bus") as TransportType;
   const needsSeatSelection = transportType === "bus" || transportType === "train";
 
+  // Guard: redirect if transport type is unknown
+  useEffect(() => {
+    const validTypes: TransportType[] = ["bus", "train", "taxi", "carpool"];
+    if (type && !validTypes.includes(type as TransportType)) {
+      navigate("/");
+    }
+  }, [type, navigate]);
+
   const [options, setOptions] = useState<SearchOption[]>([]);
   const [selectedOption, setSelectedOption] = useState<SearchOption | null>(null);
   const [passengers, setPassengers] = useState(1);
