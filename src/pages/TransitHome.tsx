@@ -4,6 +4,7 @@ import { BriefcaseBusiness, Bus, Car, Fuel, History, LogOut, MapPin, RadioTower,
 import FareComparisonPanel, { type ComparisonCard } from "@/components/FareComparisonPanel";
 import NearbyStations from "@/components/NearbyStations";
 import PNRStatus from "@/components/PNRStatus";
+import AiAssistant from "@/components/AiAssistant";
 import RouteInfo from "@/components/RouteInfo";
 import RouteMap from "@/components/RouteMap";
 import RouteSearch from "@/components/RouteSearch";
@@ -656,6 +657,10 @@ export default function TransitHome() {
               ) : null}
               <PNRStatus />
             </div>
+
+            <div className="mt-8">
+              <AiAssistant />
+            </div>
           </section>
         ) : isLoading ? (
         <section className="space-y-8 animate-in fade-in duration-500">
@@ -684,6 +689,10 @@ export default function TransitHome() {
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50"><Train className="w-4 h-4" /> Trains</div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50"><Car className="w-4 h-4" /> Taxis</div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50"><Users className="w-4 h-4" /> Carpools</div>
+          </div>
+
+          <div className="mt-12 text-left">
+            <AiAssistant />
           </div>
         </section>
       )}

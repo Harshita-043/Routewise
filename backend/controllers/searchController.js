@@ -1,6 +1,7 @@
 import { getPlaceAutocomplete } from "../services/mapsService.js";
 import { getFallbackLocationSuggestions } from "../utils/fallbackModule.js";
 import { searchTransportOptions } from "../services/searchService.js";
+import { haversineDistanceKm } from "../utils/utils.js";
 
 /**
  * GET /api/geocode?q=<query>
@@ -63,47 +64,76 @@ export async function getRouteSummary(req, res) {
     return res.status(400).json({ error: "Missing coordinates" });
   }
 
+  const sLat = Number(startLat);
+  const sLng = Number(startLng);
+  const eLat = Number(endLat);
+  const eLng = Number(endLng);
+
   try {
     const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`,
+      `https://router.project-osrm.org/route/v1/driving/${sLng},${sLat};${eLng},${eLat}?overview=full&geometries=geojson`,
+      { signal: AbortSignal.timeout(6000) }
     );
 
-    if (!response.ok) {
-      return res.status(502).json({ error: "Routing provider request failed" });
+    if (response.ok) {
+      const data = await response.json();
+      const route = data.routes?.[0];
+
+      if (route) {
+        const distanceKm = route.distance / 1000;
+        const durationMin = Math.round(route.duration / 60);
+
+        return res.json({
+          distance: distanceKm,
+          duration: durationMin,
+          fares: {
+            bus: Math.round(Math.max(25, distanceKm * 2.8)),
+            taxi: Math.round(80 + distanceKm * 15),
+            train: Math.round(Math.max(35, distanceKm * 2.1)),
+            carpool: Math.round(Math.max(30, distanceKm * 4.2)),
+            fuel: Math.round(distanceKm * 5.8),
+          },
+          times: {
+            bus: Math.round(durationMin * 1.25),
+            taxi: durationMin,
+            train: Math.round(durationMin * 0.82),
+            carpool: Math.round(durationMin * 1.05),
+            fuel: durationMin,
+          },
+          geometry: route.geometry.coordinates.map((coord) => [coord[1], coord[0]]),
+        });
+      }
     }
-
-    const data = await response.json();
-    const route = data.routes?.[0];
-
-    if (!route) {
-      return res.status(404).json({ error: "No route found" });
-    }
-
-    const distanceKm = route.distance / 1000;
-    const durationMin = Math.round(route.duration / 60);
-
-    return res.json({
-      distance: distanceKm,
-      duration: durationMin,
-      fares: {
-        bus: Math.round(Math.max(25, distanceKm * 2.8)),
-        taxi: Math.round(80 + distanceKm * 15),
-        train: Math.round(Math.max(35, distanceKm * 2.1)),
-        carpool: Math.round(Math.max(30, distanceKm * 4.2)),
-        fuel: Math.round(distanceKm * 5.8),
-      },
-      times: {
-        bus: Math.round(durationMin * 1.25),
-        taxi: durationMin,
-        train: Math.round(durationMin * 0.82),
-        carpool: Math.round(durationMin * 1.05),
-        fuel: durationMin,
-      },
-      geometry: route.geometry.coordinates.map((coord) => [coord[1], coord[0]]),
-    });
-  } catch {
-    return res.status(500).json({ error: "Failed to calculate route" });
+  } catch (err) {
+    console.warn("[RouteSummary] OSRM fetch failed, using haversine fallback:", err.message);
   }
+
+  // Fallback distance calculation using Haversine
+  const distanceKm = Math.round(haversineDistanceKm({ lat: sLat, lng: sLng }, { lat: eLat, lng: eLng }));
+  const durationMin = Math.round((distanceKm / 60) * 60);
+
+  return res.json({
+    distance: distanceKm,
+    duration: durationMin,
+    fares: {
+      bus: Math.round(Math.max(25, distanceKm * 2.8)),
+      taxi: Math.round(80 + distanceKm * 15),
+      train: Math.round(Math.max(35, distanceKm * 2.1)),
+      carpool: Math.round(Math.max(30, distanceKm * 4.2)),
+      fuel: Math.round(distanceKm * 5.8),
+    },
+    times: {
+      bus: Math.round(durationMin * 1.25),
+      taxi: durationMin,
+      train: Math.round(durationMin * 0.82),
+      carpool: Math.round(durationMin * 1.05),
+      fuel: durationMin,
+    },
+    geometry: [
+      [sLat, sLng],
+      [eLat, eLng],
+    ],
+  });
 }
 
 export async function searchOptions(req, res) {

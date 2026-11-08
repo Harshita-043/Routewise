@@ -31,23 +31,9 @@ function setCachedValue(key, value) {
   });
 }
 
-function calculateSimulatedAvailability(train, date, classType) {
-  const seed = `${train.trainNo}${date}${classType}`.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const fareBreakdown = buildFareBreakdown({ train, classType, date });
-  const seatsLeft = seed % 37;
-
-  return {
-    available: seatsLeft > 0,
-    seatsLeft,
-    currentFare: fareBreakdown.total,
-    tatkalSurcharge: fareBreakdown.tatkalSurcharge,
-    quota: seatsLeft > 10 ? "GN" : "WL",
-    source: "simulated",
-  };
-}
-
 export async function getTrainAvailability(train, date, classType = "SL") {
-  const key = getCacheKey(train.trainNo, date, classType);
+  const trainNumber = train.trainNo || train.trainNumber || train.code || "";
+  const key = getCacheKey(trainNumber, date, classType);
   const cachedValue = getCachedValue(key);
 
   if (cachedValue) {
@@ -56,8 +42,8 @@ export async function getTrainAvailability(train, date, classType = "SL") {
 
   const fareBreakdown = buildFareBreakdown({ train, classType, date });
 
-  console.log(`[Availability] RAG fetch for train ${train.trainNo} class ${classType} on ${date}`);
-  const query = `train ${train.trainNo} seat availability ${classType} class on ${date} fare tatkal`;
+  console.log(`[Availability] RAG fetch for train ${trainNumber} class ${classType} on ${date}`);
+  const query = `train ${trainNumber} seat availability ${classType} class on ${date} fare tatkal`;
   const webContext = await searchWeb(query);
 
   let value = null;
@@ -67,10 +53,10 @@ export async function getTrainAvailability(train, date, classType = "SL") {
 Extract the current seat availability and ticket price from the web context for the given train, class, and date.
 Return a JSON object strictly matching this schema:
 {
-  "available": true, // false if Waitlisted or Unavailable
-  "seatsLeft": 15, // number of seats left, or 0 if WL/REGRET
-  "currentFare": 450, // total fare in INR
-  "quota": "GN" // GN for General, WL for Waitlist, TQ for Tatkal
+  "available": true,
+  "seatsLeft": 15,
+  "currentFare": 450,
+  "quota": "GN"
 }
 Rules:
 - If Waitlisted (WL) or RAC, set available: false, seatsLeft: 0, quota: "WL".
@@ -80,28 +66,36 @@ Rules:
     try {
       const extracted = await extractStructuredData(
         SYSTEM_PROMPT,
-        `Train: ${train.trainNo}\nClass: ${classType}\nDate: ${date}\nContext:\n${webContext}`
+        `Train: ${trainNumber}\nClass: ${classType}\nDate: ${date}\nContext:\n${webContext}`
       );
 
       if (extracted && typeof extracted.available === "boolean") {
-        console.log(`[Availability] RAG extraction success for ${train.trainNo} ${classType}`);
+        console.log(`[Availability] RAG extraction success for ${trainNumber} ${classType}`);
         value = {
           available: extracted.available,
           seatsLeft: Number(extracted.seatsLeft || 0),
           currentFare: Number(extracted.currentFare || fareBreakdown.total),
-          tatkalSurcharge: fareBreakdown.tatkalSurcharge, // Keep derived tatkal calculation
+          tatkalSurcharge: fareBreakdown.tatkalSurcharge,
           quota: extracted.quota || "GN",
           source: "rag",
         };
       }
     } catch (err) {
-      console.error("[Availability] RAG extraction failed:", err.message);
+      console.warn("[Availability] RAG extraction failed:", err.message);
     }
   }
 
+  // When live web retrieval yields no verified data, return honest unverified state
   if (!value) {
-    console.warn(`[Availability] RAG returned null for ${train.trainNo} ${classType}. Falling back to simulation.`);
-    value = calculateSimulatedAvailability(train, date, classType);
+    value = {
+      available: false,
+      seatsLeft: null,
+      currentFare: fareBreakdown.total,
+      tatkalSurcharge: fareBreakdown.tatkalSurcharge,
+      quota: "GN",
+      source: "unverified",
+      message: "Live seat availability requires direct IRCTC/CRIS API gateway integration.",
+    };
   }
 
   setCachedValue(key, value);

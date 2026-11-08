@@ -79,7 +79,7 @@ export default function MyBookings() {
         localStorage.removeItem("routewise-user");
         navigate("/auth?redirect=%2Fmy-bookings");
       });
-  }, [navigate]);
+  }, [navigate, loadBookings]);
 
   const handleCancel = async (id: string) => {
     setCancelError(null);

@@ -1,38 +1,8 @@
 import { searchWeb } from "./webSearchService.js";
 import { extractStructuredData } from "./llmService.js";
 
-// ─── Deterministic simulation fallback ───────────────────────────────────────
-function createSeedNumber(input) {
-  return String(input)
-    .split("")
-    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
-}
-
-const FALLBACK_STATIONS = [
-  "Kanpur Central", "Agra Cantt", "Mathura Jn", "Jhansi Jn",
-  "Bhopal Jn", "Nagpur", "Itarsi Jn", "Allahabad Jn", "Varanasi Jn",
-  "Gwalior", "Surat", "Vadodara Jn", "Ratlam Jn", "Kota Jn",
-];
-
-function simulateLiveStatus(trainNo, date) {
-  const seed = createSeedNumber(`${trainNo}${date}`);
-  const todayStr = new Date().toISOString().split("T")[0];
-  return {
-    trainNo,
-    date: todayStr,
-    delayMinutes: seed % 48,
-    currentStation: FALLBACK_STATIONS[seed % FALLBACK_STATIONS.length],
-    currentLocation: {
-      lat: 22.5 + (seed % 15) * 0.6,
-      lng: 76.5 + (seed % 15) * 0.55,
-    },
-    status: seed % 3 === 0 ? "Running right time" : "Running with minor delay",
-    source: "simulated",
-  };
-}
-
 // ─── RAG-based live status extraction ────────────────────────────────────────
-const SYSTEM_PROMPT = `You are a strict data extraction engine for Indian Railways live train status.
+const LIVE_STATUS_SYSTEM_PROMPT = `You are a strict data extraction engine for Indian Railways live train running status.
 Extract the current running status of the given train based ONLY on the provided web context.
 Return a JSON object strictly matching this schema:
 {
@@ -41,7 +11,7 @@ Return a JSON object strictly matching this schema:
   "status": "One-line human-readable status e.g. 'Running on time' or 'Running 25 min late'",
   "lat": 22.5,
   "lng": 78.5,
-  "actualDate": "YYYY-MM-DD" // The actual journey start date this live status corresponds to.
+  "actualDate": "YYYY-MM-DD"
 }
 Rules:
 - If the train is on time, set delayMinutes to 0.
@@ -50,28 +20,32 @@ Rules:
 - If no reliable data is found, return null.
 - Do NOT hallucinate. Only use data present in the context.`;
 
+/**
+ * Retrieves train live running status via RAG web search.
+ * When official GPS/RTIS API is unconfigured and web search yields no verified status,
+ * returns an honest unverified state rather than fabricated simulation.
+ */
 export async function getTrainLiveStatus(trainNo, date) {
   console.log(`[LiveStatus] RAG fetch for train ${trainNo} on ${date}`);
 
-  // 1. Web search
   const query = `train ${trainNo} live running status today current station India`;
   const webContext = await searchWeb(query);
 
   if (webContext) {
     try {
       const extracted = await extractStructuredData(
-        SYSTEM_PROMPT,
+        LIVE_STATUS_SYSTEM_PROMPT,
         `Train Number: ${trainNo}\nDate: ${date}\n\nContext:\n${webContext}`
       );
 
       if (
         extracted &&
         typeof extracted.currentStation === "string" &&
-        extracted.currentStation.length > 1
+        extracted.currentStation.trim().length > 1 &&
+        extracted.currentStation.toLowerCase() !== "null"
       ) {
         console.log(`[LiveStatus] RAG extracted station: ${extracted.currentStation}`);
         
-        // Use extracted date, default to today's date if missing (because live status implies currently running)
         const todayStr = new Date().toISOString().split("T")[0];
         const displayDate = extracted.actualDate || todayStr;
 
@@ -79,7 +53,7 @@ export async function getTrainLiveStatus(trainNo, date) {
           trainNo,
           date: displayDate,
           delayMinutes: Number(extracted.delayMinutes ?? 0),
-          currentStation: extracted.currentStation,
+          currentStation: extracted.currentStation.trim(),
           currentLocation: {
             lat: Number(extracted.lat ?? 22.5),
             lng: Number(extracted.lng ?? 78.5),
@@ -88,37 +62,84 @@ export async function getTrainLiveStatus(trainNo, date) {
           source: "rag",
         };
       }
-
-      console.warn("[LiveStatus] RAG returned null or incomplete data — using simulation.");
     } catch (err) {
-      console.error("[LiveStatus] RAG extraction failed:", err.message);
+      console.warn("[LiveStatus] RAG extraction failed:", err.message);
     }
-  } else {
-    console.warn("[LiveStatus] No web context available — using simulation.");
   }
 
-  // 2. Deterministic simulation fallback
-  return simulateLiveStatus(trainNo, date);
+  // Honest unavailable state when neither direct GPS gateway nor web evidence exists
+  const todayStr = new Date().toISOString().split("T")[0];
+  return {
+    trainNo,
+    date: date || todayStr,
+    delayMinutes: 0,
+    currentStation: "Live status currently unavailable",
+    currentLocation: {
+      lat: 28.6139,
+      lng: 77.209,
+    },
+    status: "Direct NTES / CRIS GPS tracking requires authorized railway gateway access.",
+    source: "unavailable",
+  };
 }
 
-// ─── PNR status (simulation — live IRCTC PNR APIs are auth-gated) ─────────────
+/**
+ * PNR status check.
+ * Indian Railways IRCTC PNR status is gated by CAPTCHAs and authorized enterprise credentials.
+ * We honestly report integration status rather than fabricating fake passenger berths.
+ */
 export async function getPnrStatus(pnr) {
-  const seed = createSeedNumber(pnr);
-  const confirmed = seed % 2 === 0;
+  const sanitizedPnr = String(pnr || "").replace(/\D/g, "");
+
+  if (sanitizedPnr.length !== 10) {
+    throw new Error("Invalid PNR. Please provide a 10-digit PNR number.");
+  }
+
+  // Check if an authorized railway PNR provider is configured
+  const pnrApiKey = process.env.IRCTC_PNR_API_KEY || process.env.RAPIDAPI_KEY;
+  if (!pnrApiKey) {
+    return {
+      pnr: sanitizedPnr,
+      trainNo: "N/A",
+      passengers: [],
+      chartPrepared: false,
+      status: "unavailable",
+      message: "Official IRCTC PNR enquiry requires direct CRIS / IRCTC API credentials. Live lookup unavailable without authorized gateway.",
+      source: "unavailable",
+    };
+  }
+
+  // If a provider adapter is configured, query the gateway
+  try {
+    const res = await fetch(`https://irctc-live-pnr-service.p.rapidapi.com/pnr/${sanitizedPnr}`, {
+      headers: {
+        "X-RapidAPI-Key": pnrApiKey,
+        "X-RapidAPI-Host": "irctc-live-pnr-service.p.rapidapi.com",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        pnr: sanitizedPnr,
+        trainNo: data.trainNo || data.train_number || "N/A",
+        passengers: data.passengers || [],
+        chartPrepared: Boolean(data.chartPrepared),
+        source: "gateway",
+      };
+    }
+  } catch (err) {
+    console.warn("[PNR] Gateway fetch failed:", err.message);
+  }
 
   return {
-    pnr,
-    trainNo: `12${String(seed % 900).padStart(3, "0")}`,
-    passengers: [
-      {
-        passenger: 1,
-        bookingStatus: confirmed ? "CNF" : "WL/4",
-        currentStatus: confirmed ? "CNF" : "RAC/1",
-        coach: confirmed ? "S3" : null,
-        berth: confirmed ? `4${seed % 10}` : null,
-      },
-    ],
-    chartPrepared: confirmed,
-    source: "simulated",
+    pnr: sanitizedPnr,
+    trainNo: "N/A",
+    passengers: [],
+    chartPrepared: false,
+    status: "unavailable",
+    message: "Could not reach PNR gateway. Please check official IRCTC portal.",
+    source: "unavailable",
   };
 }

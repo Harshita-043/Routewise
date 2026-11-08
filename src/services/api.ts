@@ -588,3 +588,46 @@ export async function fetchSavedTrainRoutes() {
     "Could not fetch saved routes",
   );
 }
+
+export interface RagSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export interface RagResponse {
+  success: boolean;
+  answer: string;
+  intent: string;
+  entities: {
+    source?: string | null;
+    destination?: string | null;
+    stationCode?: string | null;
+    date?: string | null;
+    trainNumber?: string | null;
+    trainName?: string | null;
+    classType?: string | null;
+    quota?: string | null;
+  };
+  retrievedData: TrainSearchResult[];
+  sources: RagSource[];
+  confidence: "high" | "medium" | "low";
+  dataFreshness: {
+    retrievedAt: string;
+    isLive: boolean;
+  };
+  provider: string;
+  cached: boolean;
+}
+
+export async function askRagAssistant(query: string) {
+  return requestJson<RagResponse>(
+    "/api/rag/query",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    },
+    "Failed to get AI assistant response",
+  );
+}

@@ -3,6 +3,7 @@ import { Carpool } from "../models/Carpool.js";
 import { Driver } from "../models/Driver.js";
 import { Taxi } from "../models/Taxi.js";
 import { Train } from "../models/Train.js";
+import { TrainSchedule } from "../models/TrainSchedule.js";
 import { locations } from "../data/seedData.js";
 import {
   findNearbyKnownLocations,
@@ -237,8 +238,9 @@ export async function searchTransportOptions({ from, to, type, date }) {
     throw new Error("Could not resolve one or both locations");
   }
 
-  const [trains, buses, taxis, carpools, drivers] = await Promise.all([
+  const [trains, trainSchedules, buses, taxis, carpools, drivers] = await Promise.all([
     Train.find().lean(),
+    TrainSchedule.find().lean(),
     Bus.find().lean(),
     Taxi.find({ availability: "online" }).lean(),
     Carpool.find({ status: "active" }).lean(),
@@ -280,6 +282,39 @@ export async function searchTransportOptions({ from, to, type, date }) {
         suggestions.train.push(buildTrainResult(train, fromPoint, toPoint, "alternate", alternate));
       }
     });
+
+    // Also match against master train schedules if no direct seed trains found
+    if (results.train.length === 0) {
+      const tripDistance = haversineDistanceKm(fromPoint, toPoint);
+      trainSchedules.forEach((schedule) => {
+        const sourceMatch = isPlaceMatch(schedule.source, fromPoint.name, 65);
+        const destMatch = isPlaceMatch(schedule.destination, toPoint.name, 65);
+
+        if (sourceMatch && destMatch) {
+          const slFare = schedule.classes?.find((c) => c.type === "SL")?.baseFare || Math.round(Math.max(60, tripDistance * 0.45));
+          results.train.push({
+            id: schedule._id,
+            code: schedule.trainNo,
+            transportType: "train",
+            label: schedule.trainName,
+            source: schedule.source,
+            destination: schedule.destination,
+            departureTime: schedule.departureTime || "08:00",
+            arrivalTime: schedule.arrivalTime || "18:00",
+            seatsAvailable: 35,
+            amount: slFare,
+            durationText: schedule.duration || formatDuration(estimateDurationHours(fromPoint, toPoint, 85)),
+            distanceKm: schedule.distanceKm || Math.round(tripDistance),
+            matchType: "direct",
+            metadata: {
+              trainNo: schedule.trainNo,
+              operatingDays: schedule.runningDays || [],
+              intermediateStations: schedule.intermediateStations?.map((s) => s.name) || [],
+            },
+          });
+        }
+      });
+    }
   }
 
   if (!type || type === "bus") {

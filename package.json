@@ -57,6 +57,8 @@
     "lint": "eslint .",
     "seed": "node backend/scripts/seed.js",
     "ingest:trains": "node backend/scripts/ingestTrainData.js",
-    "server": "node backend/server.js"
+    "server": "node backend/server.js",
+    "test": "node --test tests/*.test.js",
+    "test:rag": "node tests/rag-evaluation.test.js"
   }
 }

@@ -11,6 +11,7 @@ import authRoutes from "./routes/authRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import carpoolRoutes from "./routes/carpoolRoutes.js";
 import driverRoutes from "./routes/driverRoutes.js";
+import ragRoutes from "./routes/ragRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import seedRoutes from "./routes/seedRoutes.js";
 import trainRoutes from "./routes/trains.js";
@@ -93,6 +94,7 @@ app.use("/api/carpool", carpoolRoutes);
 app.use("/api", driverRoutes);
 app.use("/api/admin", seedRoutes);
 app.use("/api/trains", trainRoutes);
+app.use("/api/rag", ragRoutes);
 
 // ── Production static file serving ─────────────────────────────────────────
 // When NODE_ENV=production (or the dist/ folder exists), serve the Vite build
