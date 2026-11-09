@@ -157,10 +157,13 @@ copy .env.example .env
 # Then edit .env with your API keys
 ```
 
-### 4. Seed the Database (optional)
+### 4. Seed the Database (Automatic / Optional)
+
+The server automatically seeds the database on startup (`initializeBackend()`). If you ever need to manually re-seed:
 
 ```bash
-node backend/scripts/seedData.js
+npm.cmd run seed
+# or: node backend/scripts/seed.js
 ```
 
 ---
